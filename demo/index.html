@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>maru-smartcube — 智能方塊連線展示</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <h1>maru-smartcube</h1>
+        <p class="tagline">通用智能方塊連線展示頁（Phase 0 — 假資料）</p>
+      </header>
+
+      <p id="support-note" class="note" hidden></p>
+
+      <section class="controls">
+        <button id="connect-btn" type="button">連線方塊</button>
+        <button id="disconnect-btn" type="button" disabled>中斷連線</button>
+        <span id="status" class="status">未連線</span>
+      </section>
+
+      <section class="log-section">
+        <div class="log-header">
+          <h2>事件 Log</h2>
+          <button id="clear-btn" type="button" class="ghost">清除</button>
+        </div>
+        <ol id="event-log" class="event-log" aria-live="polite"></ol>
+      </section>
+
+      <footer>
+        <p>
+          Phase 0 骨架：目前為假資料模擬，尚未接真方塊。
+          真實藍牙連線於 Phase 1（GAN）起接入。
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
