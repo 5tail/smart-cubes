@@ -259,7 +259,7 @@ async function readAdvertisement(device: BluetoothDevice): Promise<unknown> {
       lastRssi = e.rssi ?? lastRssi;
       e.manufacturerData.forEach((v, k) => (manufacturerData[`cic_0x${k.toString(16).padStart(4, '0')}`] = dvToHex(v)));
       e.serviceData.forEach((v, k) => (serviceData[k] = dvToHex(v)));
-      (e.uuids ?? []).forEach((u) => uuids.add(u));
+      (e.uuids ?? []).forEach((u) => uuids.add(String(u)));
     };
     const finish = (): void => {
       clearTimeout(timer);
