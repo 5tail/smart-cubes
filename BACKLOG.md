@@ -10,8 +10,9 @@
 - [x] Phase 2：QiYi + MoYu driver — 由 csTimer 移植（`qiyicube.js` / `moyu32cube.js`），fixture 測試覆蓋解密/解析；QiYi ACK 邏輯進 driver。共用 `utils/crypto.ts`(AES-128) 與 `utils/facelets.ts`(CubieCube)。（實機驗收待五尾）
 - [x] MAC 記憶（localStorage，SPEC §7 第二層）+ 友善引導對話框（demo）；driver MAC fallback 順序對齊 `gan-web-bluetooth`。GAN 首次一次性輸入後即記住。
 - [ ] **決策層**：MAC 記憶要不要進「套件層」（目前只在 demo）。套件保持純粹、把儲存交給 app（macProvider）是刻意選擇；若未來多個下游都要記憶，再評估是否提供內建 localStorage 版。
-- [ ] GAN 自動抓 MAC 需 `chrome://flags/#enable-experimental-web-platform-features`（`watchAdvertisements`）。一般使用者引導頁待 Phase 3；真正零設定需桌面 App（Electron/Tauri，SPEC Phase 4 週賽專案再議）。
-- [ ] Phase 3：README（中英雙語）、CONTRIBUTING、npm publish 0.1.0、demo 加支援清單。
+- [x] GAN 自動抓 MAC 需 `chrome://flags/#enable-experimental-web-platform-features`（`watchAdvertisements`）— 已於 README/demo 說明三層 fallback（開旗標自動抓 / 手動輸入一次 / 記憶）。真正零設定需桌面 App（Electron/Tauri，SPEC Phase 4 週賽專案再議）。
+- [x] Phase 3（文件）：README（中英雙語）、CONTRIBUTING、demo 加支援清單與已知限制。
+- [ ] Phase 3（發佈）：npm publish 0.1.0 — **待 QiYi 標準版（QY-QYSC）實機驗過再發**。
 - [x] `src/core/timesync.ts`（線性回歸時間戳校正，`createTimestampFitter`）。
 - [x] `src/core/connect.ts`（統一入口；品牌偵測待 Phase 2 多品牌整合）。
 - [ ] `src/core/SmartCube.ts`（抽象基底）— 目前 GanDriver 直接實作 `SmartCube` 介面，抽象基底待有第二個 driver 時再視需要抽出。
