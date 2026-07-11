@@ -33,6 +33,7 @@ const macOkBtn = document.querySelector<HTMLButtonElement>('#mac-ok')!;
 const macCancelBtn = document.querySelector<HTMLButtonElement>('#mac-cancel')!;
 const recordBtn = document.querySelector<HTMLButtonElement>('#record-btn')!;
 const downloadBtn = document.querySelector<HTMLButtonElement>('#download-btn')!;
+const diagnoseBtn = document.querySelector<HTMLButtonElement>('#diagnose-btn')!;
 
 renderSolved(mapEl);
 
@@ -235,6 +236,97 @@ recordBtn.addEventListener('click', () => {
   recordBtn.textContent = recording ? '⏹ 停止錄製' : '🔴 錄製封包';
   recordBtn.classList.toggle('recording', recording);
   downloadBtn.disabled = recording; // 停止後才能下載
+});
+
+// --- 診斷（未知方塊型號除錯）：抓廣播 manufacturer data（含真 MAC）+ 已授權服務的特徵值 ---
+function dvToHex(dv: DataView): string {
+  return Array.from({ length: dv.byteLength }, (_, i) => dv.getUint8(i).toString(16).padStart(2, '0')).join('');
+}
+
+async function readAdvertisement(device: BluetoothDevice): Promise<unknown> {
+  const dev = device as BluetoothDevice & { watchAdvertisements?: (o?: { signal: AbortSignal }) => Promise<void> };
+  if (typeof dev.watchAdvertisements !== 'function') return 'watchAdvertisements 不支援（未開實驗旗標？）';
+  return new Promise((resolve) => {
+    const ac = new AbortController();
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      device.removeEventListener('advertisementreceived', onAdv as EventListener);
+      ac.abort();
+    };
+    const onAdv = (e: BluetoothAdvertisingEvent): void => {
+      const manufacturerData: Record<string, string> = {};
+      e.manufacturerData.forEach((v, k) => (manufacturerData[`cic_0x${k.toString(16).padStart(4, '0')}`] = dvToHex(v)));
+      const serviceData: Record<string, string> = {};
+      e.serviceData.forEach((v, k) => (serviceData[k] = dvToHex(v)));
+      cleanup();
+      resolve({ rssi: e.rssi, uuids: e.uuids, manufacturerData, serviceData });
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve('逾時：10 秒內沒收到廣播（先轉一下方塊喚醒再試）');
+    }, 10000);
+    device.addEventListener('advertisementreceived', onAdv as EventListener);
+    dev.watchAdvertisements({ signal: ac.signal }).catch(() => {
+      cleanup();
+      resolve('watchAdvertisements 失敗');
+    });
+  });
+}
+
+// 已知可能用到的服務 UUID（Web Bluetooth 只能列舉事先宣告的服務）。
+const KNOWN_SERVICES = [
+  '0000fff0-0000-1000-8000-00805f9b34fb', // QiYi
+  '00001000-0000-1000-8000-00805f9b34fb', // MoYu（舊版 MHC）
+  '0783b03e-7735-b5a0-1760-a305d2795cb0', // MoYu WeiLong AI
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART（常見備援）
+  'battery_service',
+  'device_information',
+];
+
+diagnoseBtn.addEventListener('click', async () => {
+  appendEvent({ type: 'error', error: new Error('診斷開始：請在瀏覽器視窗選擇方塊…') });
+  const report: Record<string, unknown> = { at: new Date().toISOString() };
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'XMD-TornadoV4' }, { namePrefix: 'QY-QYSC' }, { namePrefix: 'WCU_MY3' }],
+      optionalServices: KNOWN_SERVICES,
+    });
+    report.deviceName = device.name;
+    report.deviceId = device.id;
+    report.advertisement = await readAdvertisement(device);
+    const gatt = await device.gatt!.connect();
+    const services: unknown[] = [];
+    for (const uuid of KNOWN_SERVICES) {
+      try {
+        const svc = await gatt.getPrimaryService(uuid);
+        const chars = await svc.getCharacteristics();
+        services.push({
+          service: svc.uuid,
+          characteristics: chars.map((c) => ({
+            uuid: c.uuid,
+            properties: Object.entries(c.properties)
+              .filter(([, on]) => on)
+              .map(([k]) => k),
+          })),
+        });
+      } catch {
+        /* 該服務不存在，略過 */
+      }
+    }
+    report.services = services;
+    gatt.disconnect();
+    appendEvent({ type: 'error', error: new Error('診斷完成，正在下載 JSON…') });
+  } catch (err) {
+    report.error = err instanceof Error ? err.message : String(err);
+    appendEvent({ type: 'error', error: err instanceof Error ? err : new Error(String(err)) });
+  }
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `maru-diagnose-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 });
 
 downloadBtn.addEventListener('click', () => {
