@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>maru-smartcube — 智能方塊連線展示</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <h1>maru-smartcube</h1>
+        <p class="tagline">通用智能方塊連線展示頁（Phase 1 — GAN 真方塊）</p>
+      </header>
+
+      <p id="support-note" class="note" hidden></p>
+
+      <section class="controls">
+        <button id="connect-btn" type="button">連線 GAN 方塊</button>
+        <button id="disconnect-btn" type="button" disabled>中斷連線</button>
+        <button id="fake-btn" type="button" class="ghost">沒有方塊？看假資料</button>
+        <span id="status" class="status">未連線</span>
+      </section>
+
+      <section class="panels">
+        <div class="panel map-panel">
+          <div class="panel-head">
+            <h2>方塊狀態（2D 展開圖）</h2>
+            <span id="battery" class="battery">電量 —</span>
+          </div>
+          <div id="cube-map" class="cube-map" aria-label="cube state"></div>
+          <p class="device" id="device-name"></p>
+        </div>
+
+        <div class="panel log-panel">
+          <div class="panel-head">
+            <h2>事件 Log</h2>
+            <button id="clear-btn" type="button" class="ghost">清除</button>
+          </div>
+          <ol id="event-log" class="event-log" aria-live="polite"></ol>
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          Phase 1：透過 <code>connectSmartCube()</code> 連線 GAN 方塊，即時顯示轉動記錄、
+          方塊當前狀態與電量。QiYi / 魔域於 Phase 2 加入。
+          需要桌機 Chrome / Edge 或 Android Chrome（Web Bluetooth）。
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
