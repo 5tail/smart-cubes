@@ -19,18 +19,23 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: demo
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+      # demo 打包時會 bundle 套件原始碼（../../src），其中 connect.ts 依賴
+      # gan-web-bluetooth。該 import 從 src/ 位置解析，需根目錄 node_modules，
+      # 故先安裝根目錄相依，再安裝 demo 相依。
+      - name: Install package deps
+        run: npm ci
       - name: Install demo deps
-        run: npm install
+        run: npm ci
+        working-directory: demo
       - name: Build demo
         run: npm run build
+        working-directory: demo
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
