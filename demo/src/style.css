@@ -21,7 +21,7 @@ body {
 }
 
 .app {
-  max-width: 720px;
+  max-width: 940px;
   margin: 0 auto;
   padding: 2rem 1.25rem 3rem;
 }
@@ -80,20 +80,58 @@ button.ghost {
   font-weight: 600;
 }
 
-.log-section {
+.panels {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+@media (min-width: 760px) {
+  .panels {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.panel {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 1rem 1.25rem 1.25rem;
 }
-.log-header {
+.panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
 }
-.log-header h2 {
+.panel-head h2 {
   margin: 0;
   font-size: 1.1rem;
+}
+
+.battery {
+  color: #6fd08c;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+/* 2D 展開圖：12 欄 × 9 列網格 */
+.cube-map {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: repeat(9, 1fr);
+  gap: 3px;
+  aspect-ratio: 12 / 9;
+  margin: 0.9rem 0 0;
+}
+.sticker {
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.device {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 .event-log {

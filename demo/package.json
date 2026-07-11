@@ -9,7 +9,11 @@
     "build": "vite build",
     "preview": "vite preview"
   },
+  "dependencies": {
+    "gan-web-bluetooth": "^3.0.2"
+  },
   "devDependencies": {
+    "@types/web-bluetooth": "^0.0.20",
     "typescript": "^5.7.2",
     "vite": "^6.0.5"
   }
