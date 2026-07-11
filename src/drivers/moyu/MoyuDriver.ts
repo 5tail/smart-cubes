@@ -21,6 +21,7 @@ import {
   parseMovePacket,
   defaultMacFromName,
 } from './protocol.js';
+import { recordPacket } from '../../utils/debug.js';
 
 /**
  * MoYu WeiLong AI driver（加密協議，WCU_MY3 前綴）：實作統一 SmartCube 介面。
@@ -86,6 +87,7 @@ export class MoyuDriver extends EventTarget implements SmartCube {
     const raw: number[] = [];
     for (let i = 0; i < value.byteLength; i++) raw[i] = value.getUint8(i);
     const decoded = decode(raw, this.aes, this.iv);
+    recordPacket('moyu', raw, decoded); // dev-only 擷取（預設 no-op）
 
     switch (messageType(decoded)) {
       case OPCODE_STATE: {

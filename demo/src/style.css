@@ -254,3 +254,17 @@ footer {
   gap: 0.6rem;
   margin-top: 1.2rem;
 }
+
+/* --- 封包錄製列 --- */
+.capture-controls {
+  margin-top: 0.6rem;
+  align-items: center;
+}
+.capture-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+#record-btn.recording {
+  color: #f5734c;
+  border-color: #f5734c;
+}

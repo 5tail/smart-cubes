@@ -2,7 +2,13 @@
 // 把統一 CubeEvent 呈現為：轉動記錄、2D 展開圖、電量。
 //
 // 直接引用套件原始碼（單一事實來源）；Phase 3 發佈後 demo 會改為 import 已發佈套件。
-import { connectSmartCube, connectQiyiCube, connectMoyuCube } from '../../src/index';
+import {
+  connectSmartCube,
+  connectQiyiCube,
+  connectMoyuCube,
+  setCapture,
+  getCaptured,
+} from '../../src/index';
 import type { CubeEvent, SmartCube } from '../../src/core/types';
 import { renderFacelets, renderSolved } from './cubeMap';
 
@@ -25,6 +31,8 @@ const macRemember = document.querySelector<HTMLInputElement>('#mac-remember')!;
 const macDeviceName = document.querySelector<HTMLParagraphElement>('#mac-device-name')!;
 const macOkBtn = document.querySelector<HTMLButtonElement>('#mac-ok')!;
 const macCancelBtn = document.querySelector<HTMLButtonElement>('#mac-cancel')!;
+const recordBtn = document.querySelector<HTMLButtonElement>('#record-btn')!;
+const downloadBtn = document.querySelector<HTMLButtonElement>('#download-btn')!;
 
 renderSolved(mapEl);
 
@@ -72,9 +80,13 @@ function appendEvent(event: CubeEvent): void {
   logEl.prepend(li);
 }
 
+// 錄製封包時同步收集 demo 端解出的事件（null = 未錄製），供下載時與原始封包對照。
+let recordedEvents: CubeEvent[] | null = null;
+
 // 依 CubeEvent 更新畫面（log + 2D 圖 + 電量），真假資料共用。
 function handleEvent(event: CubeEvent): void {
   appendEvent(event);
+  if (recordedEvents !== null) recordedEvents.push(event);
   if (event.type === 'facelets') renderFacelets(mapEl, event.facelets);
   if (event.type === 'battery') batteryEl.textContent = `電量 ${event.level}%`;
 }
@@ -211,6 +223,36 @@ disconnectBtn.addEventListener('click', async () => {
 
 clearBtn.addEventListener('click', () => {
   logEl.replaceChildren();
+});
+
+// --- 封包錄製（實機 fixture 擷取）---
+let recording = false;
+
+recordBtn.addEventListener('click', () => {
+  recording = !recording;
+  setCapture(recording); // 開啟時清空 driver 端緩衝
+  recordedEvents = recording ? [] : recordedEvents;
+  recordBtn.textContent = recording ? '⏹ 停止錄製' : '🔴 錄製封包';
+  recordBtn.classList.toggle('recording', recording);
+  downloadBtn.disabled = recording; // 停止後才能下載
+});
+
+downloadBtn.addEventListener('click', () => {
+  const dump = {
+    brand: cube?.brand ?? null,
+    deviceName: cube?.deviceName ?? null,
+    capturedAt: new Date().toISOString(),
+    note: '實機封包擷取（raw=原始加密, decoded=driver 解密後）；events=demo 解出的事件。不含 MAC。',
+    packets: getCaptured(),
+    events: recordedEvents ?? [],
+  };
+  const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `maru-capture-${dump.brand ?? 'cube'}-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 });
 
 // --- 假資料（無方塊時預覽介面用）---

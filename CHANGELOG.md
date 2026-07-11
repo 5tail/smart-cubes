@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+### 實機封包擷取（Phase 2 實機驗收 / fixture 行為錨）
+
+- `src/utils/debug.ts`：dev-only 封包擷取（`setCapture` / `recordPacket` / `getCaptured` /
+  `clearCaptured`），預設關閉、零負擔；QiYi / MoYu driver 於收到通知時記錄
+  原始加密位元組與 driver 解密後位元組。不記錄 MAC（只存 raw + decoded，避免裝置位址外流）。
+- `src/index.ts`：匯出擷取控制（非 SPEC §3 合約）。
+- demo：新增「🔴 錄製封包 / ⬇ 下載封包 JSON」；錄製後轉方塊即可匯出
+  `{brand, deviceName, packets:[{raw,decoded}], events}`，回傳後補進 `tests/fixtures/`，
+  把 csTimer 合成向量升級成真實韌體行為錨。
+- 測試 4 例（開關、raw/decoded hex、緩衝清空）。
+
 ### MAC 記憶與友善輸入（demo UX；SPEC §7 三層 fallback）
 
 - demo：以 `<dialog>` 引導對話框取代裸 `prompt()` —— 含「MAC 在哪找」圖文、格式驗證/正規化

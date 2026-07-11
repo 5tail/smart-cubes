@@ -10,6 +10,7 @@ import {
   parseCubeData,
   defaultMacFromName,
 } from './protocol.js';
+import { recordPacket } from '../../utils/debug.js';
 
 /**
  * QiYi AI 3x3 driver：實作統一 SmartCube 介面。
@@ -76,6 +77,7 @@ export class QiyiDriver extends EventTarget implements SmartCube {
     for (let i = 0; i < value.byteLength; i++) enc[i] = value.getUint8(i);
 
     const msg = decodeNotification(enc);
+    recordPacket('qiyi', enc, msg ?? undefined); // dev-only 擷取（預設 no-op）
     if (!msg) return; // CRC 失敗直接忽略（可能是雜訊封包）
 
     const { events, ack, lastTs } = parseCubeData(msg, this.lastTs, this.battery);

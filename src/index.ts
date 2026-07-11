@@ -11,6 +11,10 @@ export { connectQiyiCube } from './drivers/qiyi/QiyiDriver.js';
 export { connectMoyuCube } from './drivers/moyu/MoyuDriver.js';
 export { createTimestampFitter } from './core/timesync.js';
 
+// dev-only 實機封包擷取（非 SPEC §3 合約；供 demo / fixture 擷取用）。
+export { setCapture, isCapturing, getCaptured, clearCaptured } from './utils/debug.js';
+export type { CapturedPacket } from './utils/debug.js';
+
 export type {
   CubeEvent,
   SmartCube,
