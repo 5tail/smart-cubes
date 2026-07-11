@@ -10,13 +10,15 @@
     <main class="app">
       <header>
         <h1>maru-smartcube</h1>
-        <p class="tagline">通用智能方塊連線展示頁（Phase 1 — GAN 真方塊）</p>
+        <p class="tagline">通用智能方塊連線展示頁（Phase 2 — GAN / QiYi / MoYu 真方塊）</p>
       </header>
 
       <p id="support-note" class="note" hidden></p>
 
       <section class="controls">
         <button id="connect-btn" type="button">連線 GAN 方塊</button>
+        <button id="connect-qiyi-btn" type="button">連線 QiYi 方塊</button>
+        <button id="connect-moyu-btn" type="button">連線 MoYu 方塊</button>
         <button id="disconnect-btn" type="button" disabled>中斷連線</button>
         <button id="fake-btn" type="button" class="ghost">沒有方塊？看假資料</button>
         <span id="status" class="status">未連線</span>
@@ -43,8 +45,8 @@
 
       <footer>
         <p>
-          Phase 1：透過 <code>connectSmartCube()</code> 連線 GAN 方塊，即時顯示轉動記錄、
-          方塊當前狀態與電量。QiYi / 魔域於 Phase 2 加入。
+          Phase 2：透過 <code>connectSmartCube()</code>（GAN）、<code>connectQiyiCube()</code>、
+          <code>connectMoyuCube()</code> 連線對應方塊，即時顯示轉動記錄、方塊當前狀態與電量。
           需要桌機 Chrome / Edge 或 Android Chrome（Web Bluetooth）。
         </p>
       </footer>

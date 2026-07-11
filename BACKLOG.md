@@ -6,14 +6,14 @@
 ## 待辦（依 SPEC Phase 排入）
 
 - [x] Phase 1：GAN driver — 包裝 `gan-web-bluetooth`，RxJS → `CubeEvent`；demo 接真方塊、2D 展開圖、電量。（實機驗收待五尾）
-- [ ] **決策層**：多品牌單一選擇視窗（SPEC 3.1「filters 一次涵蓋三家」）。gan-web-bluetooth 自帶 `requestDevice`（僅 GAN filters），故 Phase 1 為 GAN 專用選擇視窗；三家並陳需在 Phase 2 其他 driver 就緒後由決策層決定整合方式。
-- [ ] Phase 2：QiYi + MoYu driver — 由 csTimer 移植，fixture 測試覆蓋解密/解析；ACK 邏輯進 driver。
+- [ ] **決策層**：多品牌單一選擇視窗（SPEC 3.1「filters 一次涵蓋三家」）。三家 driver 皆已就緒，各有專用入口 `connectSmartCube`(GAN) / `connectQiyiCube` / `connectMoyuCube`。整合障礙：gan-web-bluetooth 自帶 `requestDevice`（僅 GAN filters），無法接收外部已選裝置；三家並陳需決策層決定整合方式（自建涵蓋三家 filters 的 `requestDevice` 後依名稱前綴分派，GAN 分支如何交由 gan-web-bluetooth 連線既有裝置待評估）。此為公開 API 形狀決策，執行層不自行決定。
+- [x] Phase 2：QiYi + MoYu driver — 由 csTimer 移植（`qiyicube.js` / `moyu32cube.js`），fixture 測試覆蓋解密/解析；QiYi ACK 邏輯進 driver。共用 `utils/crypto.ts`(AES-128) 與 `utils/facelets.ts`(CubieCube)。（實機驗收待五尾）
 - [ ] Phase 3：README（中英雙語）、CONTRIBUTING、npm publish 0.1.0、demo 加支援清單。
 - [x] `src/core/timesync.ts`（線性回歸時間戳校正，`createTimestampFitter`）。
 - [x] `src/core/connect.ts`（統一入口；品牌偵測待 Phase 2 多品牌整合）。
 - [ ] `src/core/SmartCube.ts`（抽象基底）— 目前 GanDriver 直接實作 `SmartCube` 介面，抽象基底待有第二個 driver 時再視需要抽出。
-- [ ] `src/utils/`：`crypto.ts`（AES / Web Crypto）、`facelets.ts`（狀態表示與驗證）。
-- [ ] `tests/fixtures/`：實機封包 hex dump（Phase 2 隨 driver 補上）。
+- [x] `src/utils/`：`crypto.ts`（最小 AES-128）、`facelets.ts`（CubieCube 狀態/轉動代數）。
+- [ ] `tests/fixtures/`：目前為 csTimer oracle 產生的合成向量；**實機封包 hex dump 待五尾**（連上真方塊時 dump 原始封包補進 `tests/fixtures/{qiyi,moyu}/`，鎖住真實韌體行為）。
 - [ ] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）。
 
 ## 範圍外 / 未來（不在 MVP）

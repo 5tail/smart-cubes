@@ -5,6 +5,35 @@
 
 ## [Unreleased]
 
+### Phase 2 — QiYi + MoYu driver（由 csTimer 移植）
+
+- **共用工具（`src/utils/`）**：
+  - `crypto.ts`：最小 AES-128（單塊 in-place 加解密），移植自 csTimer `sha256.js` 的 `AES128`。
+    Web Crypto 不支援 AES-128-ECB，且兩家皆以 16-byte 單塊為單位，故自帶最小實作。
+  - `facelets.ts`：`CubieCube` 方塊狀態表示與 18 個基本轉動代數，移植自 csTimer `mathlib.js`。
+    MoYu 只在初始狀態帶一次 facelet，之後靠轉動代數重建當前狀態。
+- **QiYi driver（`src/drivers/qiyi/`）**：移植自 csTimer `qiyicube.js`。
+  - `protocol.ts`（純函式，fixture 覆蓋）：CRC-16/MODBUS、AES-128-ECB 封包框架、
+    hello 建構、facelet（27 bytes→54 字元）與轉動碼（1–12→WCA）解析、hello/state 封包解析與
+    **自動 ACK** 內容產生（QiYi 漏送 ACK 會斷線，邏輯進 driver 內部）。金鑰為固定 16-byte，
+    MAC 僅用於 hello 內容。
+  - `QiyiDriver.ts`：BLE I/O + 事件投遞，每包自動回送 ACK；`connectQiyiCube()` 專用連線入口
+    （MAC 三層 fallback：廣播資料 → 名稱推導 → `macProvider`）。
+- **MoYu driver（`src/drivers/moyu/`）**：移植自 csTimer `moyu32cube.js`（WeiLong AI，WCU_MY3 前綴）。
+  - `protocol.ts`（純函式，fixture 覆蓋）：MAC 推導金鑰/IV、GAN Gen2/3 式 AES+IV 重疊塊加解密、
+    bit 欄位解析（狀態 facelet、電量、移動封包的轉動碼/時間增量/moveCnt）。
+  - `MoyuDriver.ts`：BLE I/O + 以 `CubieCube` 逐步重建 facelet、累積方塊內部時鐘作為 `cubeTimestamp`；
+    `connectMoyuCube()` 專用連線入口（MAC 為金鑰推導必需，同三層 fallback）。
+- **測試（無硬體，csTimer 為 oracle）**：以 csTimer 各模組在 Node 直接產生
+  加解密向量、facelet/move 解析結果與完整加密封包，存於 `tests/fixtures/*.json`；
+  另加 AES FIPS-197 官方向量與方塊代數不變量（逆轉/四轉/sexy×6 還原）做獨立驗證。
+  新增 39 例測試（crypto 4、facelets 9、qiyi 協議 11 + driver 5、moyu 協議 10 + driver 5）。
+- `src/index.ts`：新增匯出 `connectQiyiCube`、`connectMoyuCube`。
+- **實機驗收待五尾**：QiYi AI 3x3 與 MoYu WeiLong AI 各自連線穩定 5 分鐘以上、
+  逐步轉動記錄與狀態正確、打亂後可逆推還原（SPEC Phase 2 驗收）。
+- **決策層待辦**：SPEC 3.1「三家並陳單一選擇視窗」尚未整合（見 BACKLOG）；
+  目前三家為各自的 `connect*Cube()` 入口。
+
 ### 時間戳校正 timesync（無硬體）
 
 - `src/core/timesync.ts`：實作 SPEC 3.4 `createTimestampFitter()` —— 對
