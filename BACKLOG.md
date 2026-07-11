@@ -16,7 +16,9 @@
 - [x] `src/core/connect.ts`（統一入口；品牌偵測待 Phase 2 多品牌整合）。
 - [ ] `src/core/SmartCube.ts`（抽象基底）— 目前 GanDriver 直接實作 `SmartCube` 介面，抽象基底待有第二個 driver 時再視需要抽出。
 - [x] `src/utils/`：`crypto.ts`（最小 AES-128）、`facelets.ts`（CubieCube 狀態/轉動代數）。
-- [ ] `tests/fixtures/`：目前為 csTimer oracle 產生的合成向量；**實機封包 hex dump 待五尾**（連上真方塊時 dump 原始封包補進 `tests/fixtures/{qiyi,moyu}/`，鎖住真實韌體行為）。
+- [x] `tests/fixtures/moyu-real.json`：MoYu WeiLong AI 實機封包（R U F' R' U'），實機驗收通過（解密/解析/重建三層對上方塊自報狀態）。
+- [ ] QiYi 實機封包 fixture + 實機驗收（待五尾用奇藝方塊擷取一段補上）。
+- [ ] MoYu 電量/資訊封包實機 fixture（本次擷取未含 0xA1/0xA4）。
 - [ ] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）。
 
 ## 範圍外 / 未來（不在 MVP）

@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+### MoYu 實機驗收通過 ✅（WeiLong AI / WCU_MY32）
+
+- 實機擷取 MoYu WeiLong AI（WCU_MY32_B6EF）操作 R U F' R' U' 的封包，
+  存為 `tests/fixtures/moyu-real.json`（真實韌體行為錨，不含 MAC）。
+- `tests/moyu-real.test.ts`（3 例）：
+  - 移動封包解出的轉動序列 = 實際操作 R U F' R' U'，moveCnt 逐包遞增；
+  - 每個狀態封包 facelet 合法（六色各 9 面）；
+  - **交叉驗證**：由 solved 用 `CubieCube` 逐步重建的 facelet，與方塊自報的狀態封包
+    (0xA3) 逐步逐字元一致 —— 解密 / 解析 / 轉動代數三層在真韌體上全數正確。
+- 電量/資訊封包本次未擷取到（已由合成 fixture 覆蓋）；QiYi 實機驗收待補。
+
 ### 實機封包擷取（Phase 2 實機驗收 / fixture 行為錨）
 
 - `src/utils/debug.ts`：dev-only 封包擷取（`setCapture` / `recordPacket` / `getCaptured` /
