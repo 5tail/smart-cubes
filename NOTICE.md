@@ -24,7 +24,9 @@ Copyright (C) 2026 五尾（小丸號）
   金鑰推導、封包格式、ACK 機制、狀態解析），以及時間戳線性回歸 `cubeTimestampLinearFit()`。
 - **標頭格式**：移植檔案開頭註明
   `Adapted from csTimer (https://github.com/cs0x7f/cstimer), Copyright Chen Shuang, GPL-3.0`
-- **對應本專案檔案**：`src/drivers/moyu/`、`src/drivers/qiyi/`、`src/core/timesync.ts`（Phase 1–2 補上）
+- **對應本專案檔案**：
+  - `src/core/timesync.ts` —— 時間戳線性回歸校正（已完成，含版權標頭）
+  - `src/drivers/moyu/`、`src/drivers/qiyi/` —— MoYu / QiYi 協議（Phase 2 補上）
 
 ### gan-web-bluetooth — GAN driver 底層依賴
 

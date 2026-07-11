@@ -5,6 +5,19 @@
 
 ## [Unreleased]
 
+### 時間戳校正 timesync（無硬體）
+
+- `src/core/timesync.ts`：實作 SPEC 3.4 `createTimestampFitter()` —— 對
+  (cubeTimestamp, hostTimestamp) 序列做最小平方法線性回歸，消除方塊時鐘漂移還原真實耗時
+  （週賽防作弊核心）。移植自 csTimer 的線性回歸法（版權標頭見檔案，NOTICE 已列）。
+- `src/index.ts`：匯出 `createTimestampFitter`，補完 SPEC 第 3 節凍結 API。
+- 測試 9 例：完美時鐘、偏快/偏慢、截距相消、雜訊逼近、null 樣本略過、樣本不足與零變異退回、反向 fit。
+
+### CI / Pages（基礎建設）
+
+- `ci.yml`：PR 階段自動跑套件與 demo 的 typecheck / test / build。
+- 修復 `pages.yml`：demo 打包會 bundle 套件原始碼，需先安裝根目錄相依再 build（改用 `npm ci`）。
+
 ### Phase 1 — GAN driver
 
 - `src/drivers/gan/`：包裝 `gan-web-bluetooth`，把其 RxJS `events$` 轉成統一 `CubeEvent`，

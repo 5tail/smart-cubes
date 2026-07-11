@@ -9,7 +9,9 @@
 - [ ] **決策層**：多品牌單一選擇視窗（SPEC 3.1「filters 一次涵蓋三家」）。gan-web-bluetooth 自帶 `requestDevice`（僅 GAN filters），故 Phase 1 為 GAN 專用選擇視窗；三家並陳需在 Phase 2 其他 driver 就緒後由決策層決定整合方式。
 - [ ] Phase 2：QiYi + MoYu driver — 由 csTimer 移植，fixture 測試覆蓋解密/解析；ACK 邏輯進 driver。
 - [ ] Phase 3：README（中英雙語）、CONTRIBUTING、npm publish 0.1.0、demo 加支援清單。
-- [ ] `src/core/`：`SmartCube.ts`（抽象基底）、`connect.ts`（品牌偵測 + 統一入口）、`timesync.ts`（線性回歸）。
+- [x] `src/core/timesync.ts`（線性回歸時間戳校正，`createTimestampFitter`）。
+- [x] `src/core/connect.ts`（統一入口；品牌偵測待 Phase 2 多品牌整合）。
+- [ ] `src/core/SmartCube.ts`（抽象基底）— 目前 GanDriver 直接實作 `SmartCube` 介面，抽象基底待有第二個 driver 時再視需要抽出。
 - [ ] `src/utils/`：`crypto.ts`（AES / Web Crypto）、`facelets.ts`（狀態表示與驗證）。
 - [ ] `tests/fixtures/`：實機封包 hex dump（Phase 2 隨 driver 補上）。
 - [ ] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）。
