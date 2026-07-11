@@ -295,20 +295,38 @@ diagnoseBtn.addEventListener('click', async () => {
     report.deviceId = device.id;
     report.advertisement = await readAdvertisement(device);
     const gatt = await device.gatt!.connect();
+    const PROP_NAMES = [
+      'broadcast',
+      'read',
+      'writeWithoutResponse',
+      'write',
+      'notify',
+      'indicate',
+      'authenticatedSignedWrites',
+      'reliableWrite',
+      'writableAuxiliaries',
+    ] as const;
     const services: unknown[] = [];
     for (const uuid of KNOWN_SERVICES) {
       try {
         const svc = await gatt.getPrimaryService(uuid);
         const chars = await svc.getCharacteristics();
-        services.push({
-          service: svc.uuid,
-          characteristics: chars.map((c) => ({
-            uuid: c.uuid,
-            properties: Object.entries(c.properties)
-              .filter(([, on]) => on)
-              .map(([k]) => k),
-          })),
-        });
+        const characteristics: unknown[] = [];
+        for (const c of chars) {
+          const props = c.properties as unknown as Record<string, boolean>;
+          const properties = PROP_NAMES.filter((k) => props[k]);
+          // 可讀特徵值就讀出來（MAC / 裝置資訊常藏在這裡）。
+          let value: string | undefined;
+          if (c.properties.read) {
+            try {
+              value = dvToHex(await c.readValue());
+            } catch (e) {
+              value = `read failed: ${e instanceof Error ? e.message : String(e)}`;
+            }
+          }
+          characteristics.push({ uuid: c.uuid, properties, ...(value !== undefined ? { value } : {}) });
+        }
+        services.push({ service: svc.uuid, characteristics });
       } catch {
         /* 該服務不存在，略過 */
       }
