@@ -10,16 +10,26 @@
     <main class="app">
       <header>
         <h1>maru-smartcube</h1>
-        <p class="tagline">通用智能方塊連線展示頁（Phase 1 — GAN 真方塊）</p>
+        <p class="tagline">通用智能方塊連線展示頁（Phase 2 — GAN / QiYi / MoYu 真方塊）</p>
       </header>
 
       <p id="support-note" class="note" hidden></p>
 
       <section class="controls">
         <button id="connect-btn" type="button">連線 GAN 方塊</button>
+        <button id="connect-qiyi-btn" type="button">連線 QiYi 方塊</button>
+        <button id="connect-moyu-btn" type="button">連線 MoYu 方塊</button>
         <button id="disconnect-btn" type="button" disabled>中斷連線</button>
         <button id="fake-btn" type="button" class="ghost">沒有方塊？看假資料</button>
         <span id="status" class="status">未連線</span>
+      </section>
+
+      <section class="controls capture-controls">
+        <button id="record-btn" type="button" class="ghost">🔴 錄製封包</button>
+        <button id="download-btn" type="button" class="ghost" disabled>⬇ 下載封包 JSON</button>
+        <span id="capture-note" class="capture-note">
+          實機驗收用：錄製後轉方塊，下載 JSON 回傳即可補進 fixtures。
+        </span>
       </section>
 
       <section class="panels">
@@ -41,10 +51,47 @@
         </div>
       </section>
 
+      <dialog id="mac-dialog" class="mac-dialog">
+        <form method="dialog" class="mac-form">
+          <h2>輸入方塊 MAC address</h2>
+          <p class="mac-device" id="mac-device-name"></p>
+          <p class="mac-help">
+            GAN 方塊需要藍牙 MAC 才能推導金鑰。若瀏覽器沒開自動偵測，請手動輸入一次
+            （之後會記住這顆方塊，不再詢問）。
+          </p>
+          <input
+            id="mac-input"
+            class="mac-input"
+            type="text"
+            inputmode="latin"
+            autocomplete="off"
+            placeholder="AB:CD:EF:12:34:56"
+            aria-label="方塊 MAC address"
+          />
+          <p class="mac-error" id="mac-error" role="alert"></p>
+          <details class="mac-where">
+            <summary>MAC 在哪裡找？</summary>
+            <ul>
+              <li><strong>Windows</strong>：裝置管理員 → 藍牙 → 方塊 → 內容 → 詳細資料 → 選「Bluetooth 裝置位址」。</li>
+              <li><strong>macOS</strong>：關於這台 Mac → 系統報告 → 藍牙 → 找到方塊 → 看 Address。</li>
+              <li>或 GAN 官方 App「Cube Station」裡也看得到。</li>
+            </ul>
+          </details>
+          <label class="mac-remember">
+            <input type="checkbox" id="mac-remember" checked />
+            記住這顆方塊（存在本機瀏覽器）
+          </label>
+          <div class="mac-actions">
+            <button type="button" id="mac-cancel" class="ghost">取消</button>
+            <button type="button" id="mac-ok">確認連線</button>
+          </div>
+        </form>
+      </dialog>
+
       <footer>
         <p>
-          Phase 1：透過 <code>connectSmartCube()</code> 連線 GAN 方塊，即時顯示轉動記錄、
-          方塊當前狀態與電量。QiYi / 魔域於 Phase 2 加入。
+          Phase 2：透過 <code>connectSmartCube()</code>（GAN）、<code>connectQiyiCube()</code>、
+          <code>connectMoyuCube()</code> 連線對應方塊，即時顯示轉動記錄、方塊當前狀態與電量。
           需要桌機 Chrome / Edge 或 Android Chrome（Web Bluetooth）。
         </p>
       </footer>
