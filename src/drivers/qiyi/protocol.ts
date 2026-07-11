@@ -10,7 +10,8 @@ import { Aes128 } from '../../utils/crypto.js';
 const UUID_SUFFIX = '-0000-1000-8000-00805f9b34fb';
 export const QIYI_SERVICE_UUID = '0000fff0' + UUID_SUFFIX;
 export const QIYI_CHRCT_UUID = '0000fff6' + UUID_SUFFIX;
-export const QIYI_NAME_PREFIXES = ['QY-QYSC', 'XMD-TornadoV4-i'];
+// 放寬到整個 Tornado V4 系列（-i / LE 等變體），csTimer 原本只列 XMD-TornadoV4-i。
+export const QIYI_NAME_PREFIXES = ['QY-QYSC', 'XMD-TornadoV4'];
 export const QIYI_CIC_LIST = [0x0504];
 
 // 固定 AES-128 金鑰（csTimer 以 LZString 壓縮存放，此為解壓後的 16 bytes）。
@@ -178,10 +179,18 @@ export function parseCubeData(
   return { events, ack: null, lastTs };
 }
 
-/** 由 QiYi 裝置名稱推導預設 MAC（csTimer 的名稱規則）；無法推導回傳 null。 */
+/**
+ * 由 QiYi 裝置名稱推導預設 MAC；無法推導回傳 null。
+ *
+ * QiYi 系列（`QY-QYSC…` / `XMD-TornadoV4…`）名稱尾端帶 4 個 16 進位字元，OUI 固定為
+ * CC:A3:00:00。csTimer 原規則只涵蓋 `<prefix>-<char>-XXXX`；此處放寬為「尾端 -XXXX」，
+ * 以同時支援 TornadoV4 LE 的 `XMD-TornadoV4LE-00F9`（無中段單字元）格式。
+ * 註：LE 版的 OUI 是否同為 CC:A3:00:00 未經證實，此為 best-effort；不對時走 macProvider 手動輸入。
+ */
 export function defaultMacFromName(deviceName: string): string | null {
-  if (/^(QY-QYSC|XMD-TornadoV4-i)-.-[0-9A-F]{4}$/.exec(deviceName)) {
-    return 'CC:A3:00:00:' + deviceName.slice(-4, -2) + ':' + deviceName.slice(-2);
+  if (/^(QY-QYSC|XMD-TornadoV4)/.test(deviceName)) {
+    const m = /-([0-9A-F]{4})$/.exec(deviceName);
+    if (m) return `CC:A3:00:00:${m[1]!.slice(0, 2)}:${m[1]!.slice(2)}`;
   }
   return null;
 }
