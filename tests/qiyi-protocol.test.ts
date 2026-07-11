@@ -103,6 +103,10 @@ describe('QiYi protocol — 完整封包（csTimer oracle）', () => {
 describe('QiYi protocol — MAC 推導', () => {
   it('由裝置名稱推導預設 MAC', () => {
     expect(defaultMacFromName('QY-QYSC-A-1234')).toBe('CC:A3:00:00:12:34');
+    // Tornado V4 LE（實機 XMD-TornadoV4LE-00F9，無中段單字元）
+    expect(defaultMacFromName('XMD-TornadoV4LE-00F9')).toBe('CC:A3:00:00:00:F9');
+    expect(defaultMacFromName('XMD-TornadoV4-i-B-5678')).toBe('CC:A3:00:00:56:78');
     expect(defaultMacFromName('SomethingElse')).toBeNull();
+    expect(defaultMacFromName('XMD-TornadoV4LE')).toBeNull(); // 無尾端 4 hex
   });
 });

@@ -1,0 +1,75 @@
+{
+ "source": "實機擷取：MoYu WeiLong AI (WCU_MY32_B6EF)，操作序列 R U F' R' U'（不含 MAC）",
+ "capturedAt": "2026-07-11T17:11:45.511Z",
+ "userSequence": [
+  "R",
+  "U",
+  "F'",
+  "R'",
+  "U'"
+ ],
+ "movePackets": [
+  {
+   "raw": "425019b2bf32ab307c971d639bae4809999bffef",
+   "decoded": "a51dbe00ee003c0049008bdd5084718200000000",
+   "moveCnt": 221,
+   "newestMove": "R"
+  },
+  {
+   "raw": "3ff95e7a9910f76363ae20ead4bbe7fb2884ac55",
+   "decoded": "a50c4e1dbe00ee003c0049de2284239000000000",
+   "moveCnt": 222,
+   "newestMove": "U"
+  },
+  {
+   "raw": "247e8f7a9d0315d28194aaf9f1d838bacf410352",
+   "decoded": "a50cf50c4e1dbe00ee003cdf0914214000000000",
+   "moveCnt": 223,
+   "newestMove": "F'"
+  },
+  {
+   "raw": "fb093f7f98378f97525f1465be437780d13927ca",
+   "decoded": "a522520cf50c4e1dbe00eee05848a10200000000",
+   "moveCnt": 224,
+   "newestMove": "R'"
+  },
+  {
+   "raw": "1cb5512819ed3a715a4bd704ed20d62d9c8b2615",
+   "decoded": "a536a122520cf50c4e1dbee12ac2451000000000",
+   "moveCnt": 225,
+   "newestMove": "U'"
+  }
+ ],
+ "statePackets": [
+  {
+   "raw": "9a2d0d9b0c47445b8e92d600bfad856b156b49b0",
+   "decoded": "a301860344a2894820906cb2d9924924b6db6ddd",
+   "moveCnt": 221,
+   "facelets": "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB"
+  },
+  {
+   "raw": "41024043ff00ecd767b6d971eca92e1516e10814",
+   "decoded": "a3b686039222894924006cb2d901c92444db6dde",
+   "moveCnt": 222,
+   "facelets": "UUUUUUFFFUBBRRRRRRRRRFFDFFDDDBDDBDDBFFDLLLLLLLLLUBBUBB"
+  },
+  {
+   "raw": "3773dce695790eff25414f6f1d97f729c076ca1d",
+   "decoded": "a3add1409222894924ad7232d900412024baeddf",
+   "moveCnt": 223,
+   "facelets": "UUUUUUURRBBBDRRDRRRDDRFFRFFDLLDDBDDBFFFLLFLLFLLLUBBUBB"
+  },
+  {
+   "raw": "eb3d6bc04242facecc7e36e346e1cabbaf01c527",
+   "decoded": "a3ad55453213094924ac71b0d8004120369a5be0",
+   "moveCnt": 224,
+   "facelets": "UUUUUUURLBRRBRRBDDRDURFURFRDLDDDFDDFFFFLLFLLFBLLBBBLBB"
+  },
+  {
+   "raw": "d7ad1fc6ce9a76a4b7d87790a9a2f5034f096687",
+   "decoded": "a30055453693094a2a9271b0d8324120ad1a5be1",
+   "moveCnt": 225,
+   "facelets": "UULUURUUURDUBRRBDDFFFRFURFRDLDDDFDDFBLLLLFLLFBRRBBBLBB"
+  }
+ ]
+}
