@@ -217,8 +217,9 @@ export async function connectMoyuCube(options: ConnectOptions = {}): Promise<Moy
   });
   const deviceName = (device.name ?? '').trim();
 
-  // MAC 為金鑰推導必需；三層 fallback：廣播資料 → 名稱推導 → macProvider 手動輸入。
-  let mac = await readMacFromAdvertisement(device);
+  // MAC 為金鑰推導必需（SPEC §7）：macProvider 記住的值 → 廣播資料 → 名稱推導 → macProvider 手動輸入。
+  let mac = (options.macProvider && (await options.macProvider(device, false))) || null;
+  if (!mac) mac = await readMacFromAdvertisement(device);
   if (!mac) mac = defaultMacFromName(deviceName);
   if (!mac && options.macProvider) mac = await options.macProvider(device, true);
   if (!mac) throw new Error('MoYu 方塊需要 MAC address 推導金鑰，且無法自動取得');

@@ -43,6 +43,43 @@
         </div>
       </section>
 
+      <dialog id="mac-dialog" class="mac-dialog">
+        <form method="dialog" class="mac-form">
+          <h2>輸入方塊 MAC address</h2>
+          <p class="mac-device" id="mac-device-name"></p>
+          <p class="mac-help">
+            GAN 方塊需要藍牙 MAC 才能推導金鑰。若瀏覽器沒開自動偵測，請手動輸入一次
+            （之後會記住這顆方塊，不再詢問）。
+          </p>
+          <input
+            id="mac-input"
+            class="mac-input"
+            type="text"
+            inputmode="latin"
+            autocomplete="off"
+            placeholder="AB:CD:EF:12:34:56"
+            aria-label="方塊 MAC address"
+          />
+          <p class="mac-error" id="mac-error" role="alert"></p>
+          <details class="mac-where">
+            <summary>MAC 在哪裡找？</summary>
+            <ul>
+              <li><strong>Windows</strong>：裝置管理員 → 藍牙 → 方塊 → 內容 → 詳細資料 → 選「Bluetooth 裝置位址」。</li>
+              <li><strong>macOS</strong>：關於這台 Mac → 系統報告 → 藍牙 → 找到方塊 → 看 Address。</li>
+              <li>或 GAN 官方 App「Cube Station」裡也看得到。</li>
+            </ul>
+          </details>
+          <label class="mac-remember">
+            <input type="checkbox" id="mac-remember" checked />
+            記住這顆方塊（存在本機瀏覽器）
+          </label>
+          <div class="mac-actions">
+            <button type="button" id="mac-cancel" class="ghost">取消</button>
+            <button type="button" id="mac-ok">確認連線</button>
+          </div>
+        </form>
+      </dialog>
+
       <footer>
         <p>
           Phase 2：透過 <code>connectSmartCube()</code>（GAN）、<code>connectQiyiCube()</code>、

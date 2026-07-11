@@ -8,6 +8,9 @@
 - [x] Phase 1：GAN driver — 包裝 `gan-web-bluetooth`，RxJS → `CubeEvent`；demo 接真方塊、2D 展開圖、電量。（實機驗收待五尾）
 - [ ] **決策層**：多品牌單一選擇視窗（SPEC 3.1「filters 一次涵蓋三家」）。三家 driver 皆已就緒，各有專用入口 `connectSmartCube`(GAN) / `connectQiyiCube` / `connectMoyuCube`。整合障礙：gan-web-bluetooth 自帶 `requestDevice`（僅 GAN filters），無法接收外部已選裝置；三家並陳需決策層決定整合方式（自建涵蓋三家 filters 的 `requestDevice` 後依名稱前綴分派，GAN 分支如何交由 gan-web-bluetooth 連線既有裝置待評估）。此為公開 API 形狀決策，執行層不自行決定。
 - [x] Phase 2：QiYi + MoYu driver — 由 csTimer 移植（`qiyicube.js` / `moyu32cube.js`），fixture 測試覆蓋解密/解析；QiYi ACK 邏輯進 driver。共用 `utils/crypto.ts`(AES-128) 與 `utils/facelets.ts`(CubieCube)。（實機驗收待五尾）
+- [x] MAC 記憶（localStorage，SPEC §7 第二層）+ 友善引導對話框（demo）；driver MAC fallback 順序對齊 `gan-web-bluetooth`。GAN 首次一次性輸入後即記住。
+- [ ] **決策層**：MAC 記憶要不要進「套件層」（目前只在 demo）。套件保持純粹、把儲存交給 app（macProvider）是刻意選擇；若未來多個下游都要記憶，再評估是否提供內建 localStorage 版。
+- [ ] GAN 自動抓 MAC 需 `chrome://flags/#enable-experimental-web-platform-features`（`watchAdvertisements`）。一般使用者引導頁待 Phase 3；真正零設定需桌面 App（Electron/Tauri，SPEC Phase 4 週賽專案再議）。
 - [ ] Phase 3：README（中英雙語）、CONTRIBUTING、npm publish 0.1.0、demo 加支援清單。
 - [x] `src/core/timesync.ts`（線性回歸時間戳校正，`createTimestampFitter`）。
 - [x] `src/core/connect.ts`（統一入口；品牌偵測待 Phase 2 多品牌整合）。

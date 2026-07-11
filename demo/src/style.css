@@ -173,3 +173,84 @@ footer {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* --- MAC 輸入對話框 --- */
+.mac-dialog {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--fg);
+  max-width: 26rem;
+  width: calc(100% - 2rem);
+  padding: 0;
+}
+.mac-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+.mac-form {
+  padding: 1.25rem 1.4rem 1.4rem;
+}
+.mac-form h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+}
+.mac-device {
+  margin: 0 0 0.5rem;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+.mac-help {
+  margin: 0 0 0.9rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.mac-input {
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-monospace, monospace;
+  font-size: 1rem;
+  letter-spacing: 1px;
+}
+.mac-input:focus {
+  outline: 2px solid var(--accent);
+  border-color: var(--accent);
+}
+.mac-error {
+  margin: 0.4rem 0 0;
+  min-height: 1.1rem;
+  color: #f5734c;
+  font-size: 0.85rem;
+}
+.mac-where {
+  margin: 0.5rem 0 0.9rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.mac-where summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+.mac-where ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+.mac-where li {
+  margin: 0.25rem 0;
+}
+.mac-remember {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.mac-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+}

@@ -18,6 +18,13 @@ const supportNote = document.querySelector<HTMLParagraphElement>('#support-note'
 const mapEl = document.querySelector<HTMLDivElement>('#cube-map')!;
 const batteryEl = document.querySelector<HTMLSpanElement>('#battery')!;
 const deviceNameEl = document.querySelector<HTMLParagraphElement>('#device-name')!;
+const macDialog = document.querySelector<HTMLDialogElement>('#mac-dialog')!;
+const macInput = document.querySelector<HTMLInputElement>('#mac-input')!;
+const macError = document.querySelector<HTMLParagraphElement>('#mac-error')!;
+const macRemember = document.querySelector<HTMLInputElement>('#mac-remember')!;
+const macDeviceName = document.querySelector<HTMLParagraphElement>('#mac-device-name')!;
+const macOkBtn = document.querySelector<HTMLButtonElement>('#mac-ok')!;
+const macCancelBtn = document.querySelector<HTMLButtonElement>('#mac-cancel')!;
 
 renderSolved(mapEl);
 
@@ -112,9 +119,71 @@ function teardown(): void {
   setConnected(false, '未連線');
 }
 
-// SPEC 3.1 fallback：自動解析 MAC 失敗時，手動輸入。
-const macProvider = async (_device: BluetoothDevice, isFallback: boolean): Promise<string | null> =>
-  isFallback ? prompt('請輸入方塊 MAC address（AA:BB:CC:DD:EE:FF）') : null;
+// --- MAC 記憶（SPEC §7 三層 fallback 的 localStorage 層）+ 友善輸入對話框 ---
+// 以 device.id（origin 內穩定的裝置識別）為 key，某顆方塊輸入一次後永久記住。
+const macKey = (device: BluetoothDevice): string => `maru-smartcube:mac:${device.id}`;
+
+function loadSavedMac(device: BluetoothDevice): string | null {
+  try {
+    return localStorage.getItem(macKey(device));
+  } catch {
+    return null;
+  }
+}
+function saveMac(device: BluetoothDevice, mac: string): void {
+  try {
+    localStorage.setItem(macKey(device), mac);
+  } catch {
+    /* 隱私模式等情境無法寫入時忽略 */
+  }
+}
+
+// 正規化為 XX:XX:XX:XX:XX:XX（接受 : - 空白或無分隔）；非 12 個 16 進位字元回傳 null。
+function normalizeMac(input: string): string | null {
+  const hex = input.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+  if (hex.length !== 12) return null;
+  return (hex.match(/.{2}/g) ?? []).join(':');
+}
+
+// 顯示引導對話框取回 MAC；取消回傳 null，勾選「記住」時存入 localStorage。
+function promptMac(device: BluetoothDevice): Promise<string | null> {
+  return new Promise((resolve) => {
+    macInput.value = loadSavedMac(device) ?? '';
+    macError.textContent = '';
+    macRemember.checked = true;
+    macDeviceName.textContent = device.name ? `方塊：${device.name}` : '';
+
+    const cleanup = (): void => {
+      macOkBtn.removeEventListener('click', onOk);
+      macCancelBtn.removeEventListener('click', onCancel);
+      macDialog.removeEventListener('cancel', onCancel);
+      macDialog.close();
+    };
+    const onOk = (): void => {
+      const norm = normalizeMac(macInput.value);
+      if (!norm) {
+        macError.textContent = '格式不對，需要 12 個 16 進位字元，例如 AB:CD:EF:12:34:56';
+        return; // 保持開啟讓使用者修正
+      }
+      if (macRemember.checked) saveMac(device, norm);
+      cleanup();
+      resolve(norm);
+    };
+    const onCancel = (e: Event): void => {
+      e.preventDefault();
+      cleanup();
+      resolve(null);
+    };
+    macOkBtn.addEventListener('click', onOk);
+    macCancelBtn.addEventListener('click', onCancel);
+    macDialog.addEventListener('cancel', onCancel); // Esc 鍵
+    macDialog.showModal();
+  });
+}
+
+// 三層 fallback：先給記住的 MAC（免詢問）→ 讓 driver 試廣播/名稱自動偵測 → 最後才跳對話框。
+const macProvider = async (device: BluetoothDevice, isFallback: boolean): Promise<string | null> =>
+  isFallback ? promptMac(device) : loadSavedMac(device);
 
 async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
   setConnected(false, '連線中…');

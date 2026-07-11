@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+### MAC 記憶與友善輸入（demo UX；SPEC §7 三層 fallback）
+
+- demo：以 `<dialog>` 引導對話框取代裸 `prompt()` —— 含「MAC 在哪找」圖文、格式驗證/正規化
+  （接受 `:`/`-`/空白/無分隔）、與「記住這顆方塊」勾選。
+- demo：以 `device.id` 為 key 把 MAC 存進 `localStorage`，某顆方塊輸入一次後永久免問
+  （SPEC §7 第二層 fallback）。
+- driver：`connectQiyiCube` / `connectMoyuCube` 的 MAC fallback 順序調整為
+  `macProvider(device,false)`（app 提供記住值）→ 廣播 → 名稱推導 → `macProvider(device,true)`（手動），
+  與 `gan-web-bluetooth` 一致，讓「記住 MAC」對三家品牌一致生效。
+- 效果：QiYi / MoYu 名稱可推導 MAC 本就零設定；GAN 首次一次性輸入後即記住，之後全自動。
+
 ### Phase 2 — QiYi + MoYu driver（由 csTimer 移植）
 
 - **共用工具（`src/utils/`）**：
