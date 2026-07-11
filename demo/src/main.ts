@@ -243,31 +243,45 @@ function dvToHex(dv: DataView): string {
   return Array.from({ length: dv.byteLength }, (_, i) => dv.getUint8(i).toString(16).padStart(2, '0')).join('');
 }
 
+// 連續蒐集 6 秒的廣播並合併（含 MAC 的「掃描回應」可能在較晚的封包才到）。
 async function readAdvertisement(device: BluetoothDevice): Promise<unknown> {
   const dev = device as BluetoothDevice & { watchAdvertisements?: (o?: { signal: AbortSignal }) => Promise<void> };
   if (typeof dev.watchAdvertisements !== 'function') return 'watchAdvertisements 不支援（未開實驗旗標？）';
   return new Promise((resolve) => {
     const ac = new AbortController();
-    const cleanup = (): void => {
+    let events = 0;
+    const manufacturerData: Record<string, string> = {};
+    const serviceData: Record<string, string> = {};
+    const uuids = new Set<string>();
+    let lastRssi: number | undefined;
+    const onAdv = (e: BluetoothAdvertisingEvent): void => {
+      events += 1;
+      lastRssi = e.rssi ?? lastRssi;
+      e.manufacturerData.forEach((v, k) => (manufacturerData[`cic_0x${k.toString(16).padStart(4, '0')}`] = dvToHex(v)));
+      e.serviceData.forEach((v, k) => (serviceData[k] = dvToHex(v)));
+      (e.uuids ?? []).forEach((u) => uuids.add(String(u)));
+    };
+    const finish = (): void => {
       clearTimeout(timer);
       device.removeEventListener('advertisementreceived', onAdv as EventListener);
       ac.abort();
+      if (events === 0) {
+        resolve('逾時：6 秒內沒收到廣播（先轉一下方塊喚醒、靠近一點再試）');
+        return;
+      }
+      resolve({
+        eventsSeen: events,
+        rssi: lastRssi,
+        uuids: [...uuids],
+        manufacturerData,
+        serviceData,
+        hasManufacturerData: Object.keys(manufacturerData).length > 0,
+      });
     };
-    const onAdv = (e: BluetoothAdvertisingEvent): void => {
-      const manufacturerData: Record<string, string> = {};
-      e.manufacturerData.forEach((v, k) => (manufacturerData[`cic_0x${k.toString(16).padStart(4, '0')}`] = dvToHex(v)));
-      const serviceData: Record<string, string> = {};
-      e.serviceData.forEach((v, k) => (serviceData[k] = dvToHex(v)));
-      cleanup();
-      resolve({ rssi: e.rssi, uuids: e.uuids, manufacturerData, serviceData });
-    };
-    const timer = setTimeout(() => {
-      cleanup();
-      resolve('逾時：10 秒內沒收到廣播（先轉一下方塊喚醒再試）');
-    }, 10000);
+    const timer = setTimeout(finish, 6000);
     device.addEventListener('advertisementreceived', onAdv as EventListener);
     dev.watchAdvertisements({ signal: ac.signal }).catch(() => {
-      cleanup();
+      clearTimeout(timer);
       resolve('watchAdvertisements 失敗');
     });
   });
