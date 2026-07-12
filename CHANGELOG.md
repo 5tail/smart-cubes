@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### QiYi 實機連線修復 ✅（三顆奇藝全通）
+
+- `connectQiyiCube` 的 `requestDevice` 補上 `optionalManufacturerData: QIYI_CIC_LIST`。
+  Chrome 只有在宣告製造商 ID 時才會在廣播交出 manufacturer data（含真實 MAC）；
+  漏宣告 → 抓不到真 MAC → hello 用名稱推導的錯 MAC → 方塊連上卻不串流（零事件）。
+- 實機驗證：**QY-QYSC-A / XMD-TornadoV4-i / Tornado V4 LE 三顆皆連線並串流成功**。
+  （先前判定「Tornado V4 LE 為不支援變體」係此缺漏所致的誤判，已更正；LE 同協議。）
+- demo 診斷工具 `requestDevice` 同步補上，使診斷能顯示真實 MAC。
+
 ### MoYu 實機驗收通過 ✅（WeiLong AI / WCU_MY32）
 
 - 實機擷取 MoYu WeiLong AI（WCU_MY32_B6EF）操作 R U F' R' U' 的封包，
