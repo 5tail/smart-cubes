@@ -41,6 +41,8 @@ export class MoyuDriver extends EventTarget implements SmartCube {
   private readonly chrctWrite: BluetoothRemoteGATTCharacteristic;
   private readonly aes: Aes128;
   private readonly iv: number[];
+  /** 本次連線實際使用的 MAC；供 app 記住以利穩定重連。 */
+  readonly mac: string;
   private readonly onValueChanged: (e: Event) => void;
   private readonly onGattDisconnected: () => void;
 
@@ -61,6 +63,7 @@ export class MoyuDriver extends EventTarget implements SmartCube {
     this.chrctRead = chrctRead;
     this.chrctWrite = chrctWrite;
     this.deviceName = deviceName;
+    this.mac = mac;
     const { key, iv } = deriveKeyIv(mac);
     this.aes = new Aes128(key);
     this.iv = iv;

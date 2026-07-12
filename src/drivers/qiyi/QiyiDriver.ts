@@ -31,7 +31,8 @@ export class QiyiDriver extends EventTarget implements SmartCube {
 
   private readonly device: BluetoothDevice;
   private readonly chrct: BluetoothRemoteGATTCharacteristic;
-  private readonly mac: string;
+  /** 本次連線實際使用的 MAC（含由廣播取得的真值）；供 app 記住以利穩定重連。 */
+  readonly mac: string;
   private readonly onValueChanged: (e: Event) => void;
   private readonly onGattDisconnected: () => void;
 
