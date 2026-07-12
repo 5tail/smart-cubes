@@ -268,3 +268,43 @@ footer {
   color: #f5734c;
   border-color: #f5734c;
 }
+
+/* --- 支援品牌與已知限制 --- */
+.support-panel {
+  margin-top: 1.2rem;
+}
+.support-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.support-table th,
+.support-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.support-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+.support-table .ok {
+  color: #6fd08c;
+}
+.support-table .pending {
+  color: #f5d38b;
+}
+.support-table .bad {
+  color: #f5734c;
+}
+.limits {
+  margin: 1rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+.limits strong {
+  color: var(--fg);
+}

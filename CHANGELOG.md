@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+### Phase 3 — 開源收尾（文件）
+
+- **`README.md`（中英雙語）**：安裝、快速上手（十行內連上方塊）、事件與 API 表、
+  瀏覽器支援矩陣、[已驗證型號]（GAN ✅、MoYu WeiLong AI ✅、QiYi 標準版 QY-QYSC 待驗、
+  Tornado V4 LE 已知不支援）、GAN 需開 `chrome://flags` 或輸入一次 MAC 的三層 fallback 說明、致謝。
+- **`CONTRIBUTING.md`**：如何新增品牌 driver（protocol/純函式 + Driver/BLE I/O 兩層、三條硬規則、
+  移植守則）、如何用 demo 的「🔍 診斷方塊 / 🔴 錄製封包」工具擷取封包並交 fixture（含隱私：不含 MAC）。
+- **demo**：加「支援品牌與已知限制」面板（品牌狀態表 + 限制說明），footer 補 GitHub 連結與授權。
+- **npm publish 暫緩**：等 QiYi 標準版（QY-QYSC）實機驗過再發 0.1.0（見 BACKLOG）。
+
 ### MoYu 實機驗收通過 ✅（WeiLong AI / WCU_MY32）
 
 - 實機擷取 MoYu WeiLong AI（WCU_MY32_B6EF）操作 R U F' R' U' 的封包，

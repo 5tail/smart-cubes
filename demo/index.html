@@ -89,11 +89,59 @@
         </form>
       </dialog>
 
+      <section class="panel support-panel">
+        <div class="panel-head">
+          <h2>支援品牌與已知限制</h2>
+        </div>
+        <table class="support-table">
+          <thead>
+            <tr><th>品牌</th><th>型號</th><th>狀態</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>GAN</td>
+              <td>GAN12 UI / i4 / i Carry（Gen2/3/4）</td>
+              <td><span class="ok">✅ 實機驗收通過</span></td>
+            </tr>
+            <tr>
+              <td>MoYu 魔域</td>
+              <td>WeiLong AI（<code>WCU_MY32</code>）</td>
+              <td><span class="ok">✅ 實機驗收通過</span></td>
+            </tr>
+            <tr>
+              <td>QiYi 奇藝</td>
+              <td>QiYi AI 3x3 標準版（<code>QY-QYSC</code>）</td>
+              <td><span class="pending">⏳ 已實作，待實機驗證</span></td>
+            </tr>
+            <tr>
+              <td>QiYi 奇藝</td>
+              <td>Tornado V4 LE（<code>XMD-TornadoV4LE</code>）</td>
+              <td><span class="bad">❌ 已知不支援</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <ul class="limits">
+          <li><strong>需要瀏覽器支援 Web Bluetooth</strong>：桌機 Chrome / Edge 或 Android Chrome；
+            iOS Safari 與 Firefox 不支援。</li>
+          <li><strong>GAN 需要 MAC</strong>：開
+            <code>chrome://flags/#enable-experimental-web-platform-features</code> 讓瀏覽器自動抓，
+            或手動輸入一次（會記住這顆方塊）。</li>
+          <li><strong>QiYi 標準版尚未實機驗證</strong>，npm 0.1.0 待驗過再發；
+            Tornado V4 LE 名稱雖被辨識，但目前協議無法正確驅動。</li>
+          <li>手上型號沒列到？用上方「🔍 診斷方塊 / 🔴 錄製封包」擷取封包，依
+            <code>CONTRIBUTING.md</code> 回傳即可協助擴充。</li>
+        </ul>
+      </section>
+
       <footer>
         <p>
           Phase 2：透過 <code>connectSmartCube()</code>（GAN）、<code>connectQiyiCube()</code>、
           <code>connectMoyuCube()</code> 連線對應方塊，即時顯示轉動記錄、方塊當前狀態與電量。
           需要桌機 Chrome / Edge 或 Android Chrome（Web Bluetooth）。
+        </p>
+        <p>
+          <a href="https://github.com/5tail/smart-cubes">GitHub</a> ·
+          套件與展示頁授權 GPL-3.0
         </p>
       </footer>
     </main>
