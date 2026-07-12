@@ -24,10 +24,10 @@
 - [x] QiYi 實機封包 fixture：`tests/fixtures/qiyi-real.json`（QY-QYSC-A 實機，B U R' U' B'）。
       因金鑰固定，測試從**原始加密封包**全程重放：解密 → CRC → 解析 → ACK，並以 CubieCube
       驗證「move 套到前一 facelet = 方塊回報的下一 facelet」5/5 一致。**QiYi 實機驗收通過。**
-- [ ] **QiYi 重連需重整網頁**（實機回報）：中斷後再連常不串流，重讀網頁才恢復。研判 `readMacFromAdvertisement`
-      的 `watchAdvertisements` 在同一 device 物件二次呼叫會失敗 → 退回名稱推導 MAC（可能錯）→ 不串流；
-      重整產生新 device 物件才恢復。**建議修法**：首次由廣播取得真 MAC 後存 localStorage，重連走
-      `macProvider` 記住值、不再每次即時抓廣播（需把 driver 解出的真 MAC 暴露給 app 儲存）。
+- [~] **QiYi 重連需重整網頁**（實機回報）：中斷後再連常不串流，重讀網頁才恢復。研判 `watchAdvertisements`
+      在同一 device 物件二次呼叫會失敗 → 退回名稱推導 MAC（可能錯）→ 不串流。**已實作修法**：
+      QiyiDriver/MoyuDriver 暴露 `mac`，demo 連上後存 localStorage，重連經 `macProvider(false)` 取回真 MAC，
+      不再每次即時抓廣播。**待五尾實機確認重連是否不必再重整。** 若仍需重整，再查 GATT/notification 重訂閱。
 - [ ] demo「🔍 診斷方塊（除錯）」工具：抓廣播（含 MAC）+ 列舉 GATT 服務/特徵值/屬性/可讀值，供未來新型號分析（已就緒）。
 - [ ] MoYu 電量/資訊封包實機 fixture（本次擷取未含 0xA1/0xA4）。
 - [ ] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）。
