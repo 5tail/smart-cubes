@@ -16,6 +16,7 @@ const connectBtn = document.querySelector<HTMLButtonElement>('#connect-btn')!;
 const connectQiyiBtn = document.querySelector<HTMLButtonElement>('#connect-qiyi-btn')!;
 const connectMoyuBtn = document.querySelector<HTMLButtonElement>('#connect-moyu-btn')!;
 const disconnectBtn = document.querySelector<HTMLButtonElement>('#disconnect-btn')!;
+const resetBtn = document.querySelector<HTMLButtonElement>('#reset-btn')!;
 const fakeBtn = document.querySelector<HTMLButtonElement>('#fake-btn')!;
 const clearBtn = document.querySelector<HTMLButtonElement>('#clear-btn')!;
 const statusEl = document.querySelector<HTMLSpanElement>('#status')!;
@@ -99,6 +100,7 @@ function setConnected(connected: boolean, label: string): void {
   connectMoyuBtn.disabled = connected || noBluetooth;
   fakeBtn.disabled = connected;
   disconnectBtn.disabled = !connected;
+  resetBtn.disabled = !connected;
   statusEl.textContent = label;
   statusEl.classList.toggle('on', connected);
 }
@@ -271,6 +273,19 @@ connectMoyuBtn.addEventListener('click', () => void doConnect(() => connectMoyuC
 disconnectBtn.addEventListener('click', async () => {
   await cube?.disconnect();
   teardown();
+});
+
+// 重置為復原（六面）。driver 提供 resetToSolved（非 SmartCube 凍結合約，故以型別守衛呼叫）。
+resetBtn.addEventListener('click', async () => {
+  const resettable = cube as Partial<{ resetToSolved: () => Promise<void> }> | null;
+  if (!resettable?.resetToSolved) return;
+  try {
+    await resettable.resetToSolved();
+    // 各 driver 會投遞更新後的 facelets 事件，2D 圖隨之更新（不在此強制上色）。
+    appendEvent({ type: 'error', error: new Error('已送出重置為復原；請確認方塊實體已復原六面。') });
+  } catch (err) {
+    appendEvent({ type: 'error', error: err instanceof Error ? err : new Error(String(err)) });
+  }
 });
 
 clearBtn.addEventListener('click', () => {
@@ -450,6 +465,7 @@ fakeBtn.addEventListener('click', () => {
   fakeClock = 0;
   setConnected(true, '已連線（假資料）');
   disconnectBtn.disabled = true; // 假資料用同一顆按鈕切換
+  resetBtn.disabled = true; // 假資料無真方塊可重置
   handleEvent({ type: 'connected' });
   handleEvent({ type: 'battery', level: 87 });
   handleEvent({ type: 'facelets', facelets: FAKE_SOLVED });

@@ -106,6 +106,14 @@ export class QiyiDriver extends EventTarget implements SmartCube {
     await this.requestState();
   }
 
+  /**
+   * 重置為復原（六面）。QiYi 無 BLE 重置指令，facelets 由方塊自身回報；
+   * 此處重送 hello 讓畫面與方塊當前狀態重新同步（方塊實體復原時即顯示六面）。
+   */
+  async resetToSolved(): Promise<void> {
+    await this.requestState();
+  }
+
   async disconnect(): Promise<void> {
     this.closed = true;
     this.chrct.removeEventListener('characteristicvaluechanged', this.onValueChanged);
