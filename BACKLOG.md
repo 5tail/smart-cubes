@@ -18,13 +18,17 @@
 - [ ] `src/core/SmartCube.ts`（抽象基底）— 目前 GanDriver 直接實作 `SmartCube` 介面，抽象基底待有第二個 driver 時再視需要抽出。
 - [x] `src/utils/`：`crypto.ts`（最小 AES-128）、`facelets.ts`（CubieCube 狀態/轉動代數）。
 - [x] `tests/fixtures/moyu-real.json`：MoYu WeiLong AI 實機封包（R U F' R' U'），實機驗收通過（解密/解析/重建三層對上方塊自報狀態）。
-- [ ] QiYi 實機封包 fixture + 實機驗收：標準 **QY-QYSC**（QiYi AI 3x3）尚未用實機驗過（目前僅單元測試 + csTimer oracle）。手邊有 QY-QYSC 時擷取一段補上即可收尾。
-- [ ] **決策層｜新型號**：QiYi **Tornado V4 LE**（`XMD-TornadoV4LE-XXXX`）不被標準奇藝 driver 支援。實機診斷發現（demo「🔍 診斷方塊」可重現）：
-  - 服務 `fff0`，特徵值 `fff4`(read/write, 讀值=`0x0f`) / `fff5`(read/write/wwr) / `fff6`(read/wwr/**notify**) / `fff7`(read/wwr)。`fff6=notify` 與標準相容，訂閱正確。
-  - 廣播**無 manufacturer data**（多次嘗試皆空/逾時）→ 無法自動取得 MAC。
-  - 名稱格式 `XMD-TornadoV4LE-00F9`（無中段單字元），與 `QY-QYSC-x-XXXX`、`XMD-TornadoV4-i-x-XXXX` 不同（名稱過濾與 MAC 推導已放寬涵蓋，故能出現在選擇視窗、能連 GATT）。
-  - 訂閱 `fff6` + 送標準 hello（名稱推導 MAC `CC:A3:00:00:00:F9`）後**不串流、零封包**；被動讀取特徵值時方塊很快**主動斷線** → 研判 hello/MAC/握手序列與標準奇藝不同。
-  - 後續可試方向：用 BLE 掃描 app（Android nRF Connect 直接顯示 BLE MAC）讀真 MAC 手動輸入測試是否僅差 MAC；反解 `fff4`/`fff5` 是否需寫入握手才開串流；交叉比對 `Flying-Toast/qiyi_smartcube_protocol`、`agolovchuk/qy-cube` 是否已涵蓋 V4 LE。屬 SPEC §10.2.6 新型號協議分析，交決策層。
+- [x] QiYi 實機連線：**QY-QYSC-A / XMD-TornadoV4-i / Tornado V4 LE 三顆實機皆連線並串流成功**。
+      根因是 `requestDevice` 漏宣告 `optionalManufacturerData` → Chrome 濾掉廣播 manufacturer data
+      → 抓不到真 MAC → hello 用名稱猜的錯 MAC → 方塊不串流。補上後三顆全通。
+      （先前「Tornado V4 LE 是不支援的協議變體」為**誤判**，實為此缺漏；LE 與標準款同協議。）
+- [x] QiYi 實機封包 fixture：`tests/fixtures/qiyi-real.json`（QY-QYSC-A 實機，B U R' U' B'）。
+      因金鑰固定，測試從**原始加密封包**全程重放：解密 → CRC → 解析 → ACK，並以 CubieCube
+      驗證「move 套到前一 facelet = 方塊回報的下一 facelet」5/5 一致。**QiYi 實機驗收通過。**
+- [~] **QiYi 重連需重整網頁**（實機回報）：中斷後再連常不串流，重讀網頁才恢復。研判 `watchAdvertisements`
+      在同一 device 物件二次呼叫會失敗 → 退回名稱推導 MAC（可能錯）→ 不串流。**已實作修法**：
+      QiyiDriver/MoyuDriver 暴露 `mac`，demo 連上後存 localStorage，重連經 `macProvider(false)` 取回真 MAC，
+      不再每次即時抓廣播。**待五尾實機確認重連是否不必再重整。** 若仍需重整，再查 GATT/notification 重訂閱。
 - [ ] demo「🔍 診斷方塊（除錯）」工具：抓廣播（含 MAC）+ 列舉 GATT 服務/特徵值/屬性/可讀值，供未來新型號分析（已就緒）。
 - [ ] MoYu 電量/資訊封包實機 fixture（本次擷取未含 0xA1/0xA4）。
 - [ ] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）。

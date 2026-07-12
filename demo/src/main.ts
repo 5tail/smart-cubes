@@ -194,14 +194,29 @@ function promptMac(device: BluetoothDevice): Promise<string | null> {
   });
 }
 
+// 記住本次選到的裝置，連上後把 driver 實際用的 MAC（含廣播取得的真值）存起來，
+// 讓下次重連直接用記住的 MAC，不必再靠 watchAdvertisements（修復「重連需重整」問題）。
+let pendingDevice: BluetoothDevice | null = null;
+
 // 三層 fallback：先給記住的 MAC（免詢問）→ 讓 driver 試廣播/名稱自動偵測 → 最後才跳對話框。
-const macProvider = async (device: BluetoothDevice, isFallback: boolean): Promise<string | null> =>
-  isFallback ? promptMac(device) : loadSavedMac(device);
+const macProvider = async (device: BluetoothDevice, isFallback: boolean): Promise<string | null> => {
+  if (!isFallback) {
+    pendingDevice = device;
+    return loadSavedMac(device);
+  }
+  return promptMac(device);
+};
 
 async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
   setConnected(false, '連線中…');
+  pendingDevice = null;
   try {
     cube = await connectFn();
+    // 記住 driver 實際用的 MAC（QiYi/MoYu driver 有 mac 屬性；GAN 無，略過）。
+    const resolvedMac = (cube as Partial<{ mac: string }>).mac;
+    if (pendingDevice && typeof resolvedMac === 'string' && resolvedMac) {
+      saveMac(pendingDevice, resolvedMac);
+    }
     for (const t of EVENT_TYPES) cube.addEventListener(t, onCubeEvent);
     deviceNameEl.textContent = `已連線：${cube.deviceName}（${cube.brand}）`;
     setConnected(true, '已連線');

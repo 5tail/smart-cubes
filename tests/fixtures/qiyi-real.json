@@ -1,0 +1,60 @@
+{
+ "source": "實機擷取：QiYi AI 3x3 標準款 (QY-QYSC-A-09F0)，實體轉動序列（demo 解出）B U R' U' B'（不含 MAC；金鑰固定，可從 raw 全程重放）",
+ "capturedAt": "2026-07-12T15:32:29.878Z",
+ "expectedMoves": [
+  "B",
+  "U",
+  "R'",
+  "U'",
+  "B'"
+ ],
+ "expectedFacelets": [
+  "DLLFUUUBLDLDBRDBBBLRBUFUURRRDDFDDLBUFRBRLFFLFFDRFBURLU",
+  "UFDBULLULFDRBRDBBBDLDUFUURRRDDFDDLBULRBRLFFLFFRBFBURLU",
+  "UFRBUFLUFRDBDRBFBBDLDUFLURLRDDFDULBRLRBRLFFLFURBDBUDLU",
+  "RFFFUUUBLDLDDRBFBBLRBUFLURLRDDFDULBRURBRLFFLFRDBDBUDLU",
+  "FRUFUUUBLDLRDRFFBFLRBUFLURLRDDFDUBBDLRBBLFRLFBUUDBLRDD"
+ ],
+ "packets": [
+  {
+   "raw": "30b75d0d6b71ebb9ed7f33e4aeea9ce4cfd10a97980e6bd857e1686f14f4f327bfa5a3ef8c303d18643d739a23c0296faadd489de230471c6d8b42a8cd6cedddaadd489de230471c6d8b42a8cd6ceddd90d6eda5b5985abdd614eb9c159c3178",
+   "decoded": "fe5e030010d96e0240335320201552551035341311222402351415400444125413300c5bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00ee9b"
+  },
+  {
+   "raw": "c1e0dcfceb00ea548fce7fa7a0f291e4cfd10a97980e6bd857e1686f14f4f327594ad4ec727b8778017151b9009f3578",
+   "decoded": "fe26020010dbe7024033532020155255103534131122240235141540044412541330005beb8e"
+  },
+  {
+   "raw": "6ecc110f0b8b077811f0ad2986a8f284028f60959bd5a0ab6da61065a9ab364394e16f1782c00277638fc55ebf03454baadd489de230471c6d8b42a8cd6cedddaadd489de230471c6d8b42a8cd6cedddcc751eb8f9156e01e83876d61c548a3d",
+   "decoded": "fe5e030010e40c435203304012155255023234131122240235101540044451541330085bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00ce49"
+  },
+  {
+   "raw": "8c6b4fdd608cadd627ab2ffcd88b0e77028f60959bd5a0ab6da61065a9ab36434db116f353714e6489fbfad1771e106c",
+   "decoded": "fe26020010e5c4435203304012155255023234131122240235101540044451541330005bab8f"
+  },
+  {
+   "raw": "d3a9bc194fd53bb2a02a3989e3b19848366919bcb5c4b036468d376a49e3f5e7a130a9b5eeb98d87f20d34ca8f02724caadd489de230471c6d8b42a8cd6cedddaadd489de230471c6d8b42a8cd6ceddd6e01852d1bcbcf423287d86da6a3f972",
+   "decoded": "fe5e030010ea6b435143301452124555023204131022240315101540043451522330035bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00c3cb"
+  },
+  {
+   "raw": "911518f124fb500e2a3c65df8af55c4a366919bcb5c4b036468d376a49e3f5e72527cbe9f8a874397de961b1d56f7daf",
+   "decoded": "fe26020010ec92435143301452124555023204131022240315101540043451522330005bb5fd"
+  },
+  {
+   "raw": "5dc1c333f5c80f1ae862a7fe13ddfeea9f3ab38450cf518fd621dec4b40088babf8089704740f9078c9c62d099bcabc1aadd489de230471c6d8b42a8cd6cedddaadd489de230471c6d8b42a8cd6ceddd0990017684327112f3514f233ae27c7b",
+   "decoded": "fe5e030010f5c3414433532020124555103504131022240315131540041452522330075bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0021e8"
+  },
+  {
+   "raw": "0a0953a7f5502c681df1b6ebe041b0039f3ab38450cf518fd621dec4b40088ba1bb41f03b9778d16f2e097f01c9bfc83",
+   "decoded": "fe26020010f79d414433532020124555103504131022240315131540041452522330005bf7e5"
+  },
+  {
+   "raw": "ad8b3dd140fb082f862125e05e99ef52b35260fa621b88c8d3de226e059902fb0dfcb9c53875bdaa60300118c67e97a2aadd489de230471c6d8b42a8cd6cedddaadd489de230471c6d8b42a8cd6cedddcb43ae83cb0072c120cff90a233c1af2",
+   "decoded": "fe5e030010fcb21443335320101244451035041310222453251055400154335210220b5bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00c7dc"
+  },
+  {
+   "raw": "0fdc1ead083dede0e5ef466026decf36b35260fa621b88c8d3de226e059902fb54a9a0a4469d62fec62fd5ad819b0df6",
+   "decoded": "fe26020010fe6a144333532010124445103504131022245325105540015433521022005ba6d3"
+  }
+ ]
+}
