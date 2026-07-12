@@ -168,6 +168,8 @@ export async function connectQiyiCube(options: ConnectOptions = {}): Promise<Qiy
   const device = await navigator.bluetooth.requestDevice({
     filters: QIYI_NAME_PREFIXES.map((namePrefix) => ({ namePrefix })),
     optionalServices: [QIYI_SERVICE_UUID],
+    // 必須宣告製造商 ID，Chrome 才會在廣播事件中交出 manufacturer data（含真實 MAC）。
+    optionalManufacturerData: [...QIYI_CIC_LIST],
   });
   const deviceName = (device.name ?? '').trim();
 

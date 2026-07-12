@@ -304,6 +304,8 @@ diagnoseBtn.addEventListener('click', async () => {
     const device = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: 'XMD-TornadoV4' }, { namePrefix: 'QY-QYSC' }, { namePrefix: 'WCU_MY3' }],
       optionalServices: KNOWN_SERVICES,
+      // 宣告 QiYi 製造商 ID，Chrome 才會在廣播中交出 manufacturer data（含真實 MAC）。
+      optionalManufacturerData: [0x0504],
     });
     report.deviceName = device.name;
     report.deviceId = device.id;
