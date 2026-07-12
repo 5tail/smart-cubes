@@ -118,6 +118,15 @@ const EVENT_TYPES: CubeEvent['type'][] = [
 function onCubeEvent(e: Event): void {
   const event = (e as CustomEvent<CubeEvent>).detail;
   handleEvent(event);
+  // 收到第一個資料事件 = 這個 MAC 確實能串流 → 才存起來（避免存到連得上卻不串流的錯 MAC）。
+  if (event.type === 'facelets' || event.type === 'move' || event.type === 'battery') {
+    dataArrived = true;
+    const resolvedMac = (cube as Partial<{ mac: string }> | null)?.mac;
+    if (!macSaved && pendingDevice && typeof resolvedMac === 'string' && resolvedMac) {
+      saveMac(pendingDevice, resolvedMac);
+      macSaved = true;
+    }
+  }
   // 每次轉動主動要一次 facelets，讓 2D 圖跟上（demo 用；套件不強制）。
   if (event.type === 'move') void cube?.requestState();
   if (event.type === 'disconnected') teardown();
@@ -148,6 +157,13 @@ function saveMac(device: BluetoothDevice, mac: string): void {
     localStorage.setItem(macKey(device), mac);
   } catch {
     /* 隱私模式等情境無法寫入時忽略 */
+  }
+}
+function clearSavedMac(device: BluetoothDevice): void {
+  try {
+    localStorage.removeItem(macKey(device));
+  } catch {
+    /* ignore */
   }
 }
 
@@ -194,15 +210,21 @@ function promptMac(device: BluetoothDevice): Promise<string | null> {
   });
 }
 
-// 記住本次選到的裝置，連上後把 driver 實際用的 MAC（含廣播取得的真值）存起來，
+// 記住本次選到的裝置；連上並「確認有串流」後才把 driver 實際用的 MAC 存起來，
 // 讓下次重連直接用記住的 MAC，不必再靠 watchAdvertisements（修復「重連需重整」問題）。
+// 只在收到資料事件後才存，避免把「連得上但不串流」的錯 MAC 存進去。
 let pendingDevice: BluetoothDevice | null = null;
+let usedSavedMac = false; // 本次連線是否採用了 localStorage 記住的 MAC
+let dataArrived = false; // 本次連線是否收到過資料事件（facelets/move/battery）
+let macSaved = false; // 本次連線是否已存過 MAC
 
 // 三層 fallback：先給記住的 MAC（免詢問）→ 讓 driver 試廣播/名稱自動偵測 → 最後才跳對話框。
 const macProvider = async (device: BluetoothDevice, isFallback: boolean): Promise<string | null> => {
   if (!isFallback) {
     pendingDevice = device;
-    return loadSavedMac(device);
+    const saved = loadSavedMac(device);
+    usedSavedMac = saved !== null;
+    return saved;
   }
   return promptMac(device);
 };
@@ -210,14 +232,28 @@ const macProvider = async (device: BluetoothDevice, isFallback: boolean): Promis
 async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
   setConnected(false, '連線中…');
   pendingDevice = null;
+  usedSavedMac = false;
+  dataArrived = false;
+  macSaved = false;
   try {
     cube = await connectFn();
-    // 記住 driver 實際用的 MAC（QiYi/MoYu driver 有 mac 屬性；GAN 無，略過）。
-    const resolvedMac = (cube as Partial<{ mac: string }>).mac;
-    if (pendingDevice && typeof resolvedMac === 'string' && resolvedMac) {
-      saveMac(pendingDevice, resolvedMac);
-    }
     for (const t of EVENT_TYPES) cube.addEventListener(t, onCubeEvent);
+    // 若這次用了記住的 MAC，卻幾秒內都沒收到資料 → 那個 MAC 可能是壞的（例如舊版存到的錯值），
+    // 清掉它，下次連線就會改走廣播重抓真 MAC。
+    const deviceForRecovery = pendingDevice;
+    if (usedSavedMac && deviceForRecovery) {
+      window.setTimeout(() => {
+        if (!dataArrived && cube && deviceForRecovery) {
+          clearSavedMac(deviceForRecovery);
+          appendEvent({
+            type: 'error',
+            error: new Error(
+              '記住的 MAC 似乎無法串流，已清除。請「重整網頁」後再連一次 —— 會重新抓真 MAC 並記住，之後重連就不必再重整。',
+            ),
+          });
+        }
+      }, 5000);
+    }
     deviceNameEl.textContent = `已連線：${cube.deviceName}（${cube.brand}）`;
     setConnected(true, '已連線');
     await cube.requestBattery();
