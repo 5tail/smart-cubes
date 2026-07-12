@@ -13,6 +13,10 @@
 - 實機驗證：**QY-QYSC-A / XMD-TornadoV4-i / Tornado V4 LE 三顆皆連線並串流成功**。
   （先前判定「Tornado V4 LE 為不支援變體」係此缺漏所致的誤判，已更正；LE 同協議。）
 - demo 診斷工具 `requestDevice` 同步補上，使診斷能顯示真實 MAC。
+- **QiYi 實機驗收通過**：`tests/fixtures/qiyi-real.json`（QY-QYSC-A 實機封包）+
+  `tests/moyu`… 風格的 `qiyi-real.test.ts`（4 例）。因奇藝金鑰固定，測試從原始加密封包
+  全程重放（解密 → CRC → 解析 → ACK），並用 CubieCube 驗證 move↔facelet 內部一致 5/5。
+- 已知限制：QiYi 中斷後重連常需重整網頁才恢復串流（見 BACKLOG，建議以 localStorage 記住真 MAC 修復）。
 
 ### MoYu 實機驗收通過 ✅（WeiLong AI / WCU_MY32）
 

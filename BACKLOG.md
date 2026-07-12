@@ -21,8 +21,13 @@
       根因是 `requestDevice` 漏宣告 `optionalManufacturerData` → Chrome 濾掉廣播 manufacturer data
       → 抓不到真 MAC → hello 用名稱猜的錯 MAC → 方塊不串流。補上後三顆全通。
       （先前「Tornado V4 LE 是不支援的協議變體」為**誤判**，實為此缺漏；LE 與標準款同協議。）
-- [ ] QiYi 實機封包 fixture：把一段實機封包凍成 `tests/fixtures/qiyi-real.json`（同 MoYu 做法），
-      完成解密/CRC/facelet/ACK 的真機行為錨。（待五尾錄一段 QY-QYSC-A 的 R U F' R' U'。）
+- [x] QiYi 實機封包 fixture：`tests/fixtures/qiyi-real.json`（QY-QYSC-A 實機，B U R' U' B'）。
+      因金鑰固定，測試從**原始加密封包**全程重放：解密 → CRC → 解析 → ACK，並以 CubieCube
+      驗證「move 套到前一 facelet = 方塊回報的下一 facelet」5/5 一致。**QiYi 實機驗收通過。**
+- [ ] **QiYi 重連需重整網頁**（實機回報）：中斷後再連常不串流，重讀網頁才恢復。研判 `readMacFromAdvertisement`
+      的 `watchAdvertisements` 在同一 device 物件二次呼叫會失敗 → 退回名稱推導 MAC（可能錯）→ 不串流；
+      重整產生新 device 物件才恢復。**建議修法**：首次由廣播取得真 MAC 後存 localStorage，重連走
+      `macProvider` 記住值、不再每次即時抓廣播（需把 driver 解出的真 MAC 暴露給 app 儲存）。
 - [ ] demo「🔍 診斷方塊（除錯）」工具：抓廣播（含 MAC）+ 列舉 GATT 服務/特徵值/屬性/可讀值，供未來新型號分析（已就緒）。
 - [ ] MoYu 電量/資訊封包實機 fixture（本次擷取未含 0xA1/0xA4）。
 - [ ] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）。
