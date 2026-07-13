@@ -41,6 +41,13 @@
   覆寫/還原/拋錯還原。
 - 註：GAN 首連仍需 MAC（開實驗旗標自動抓，或輸入一次後由 demo 記住）——Web Bluetooth
   刻意不給網頁 MAC，且 GAN 裝置名稱不含 MAC（QiYi/MoYu 有），詳見 ADR。
+- **回歸修復（實機回報「MoYu 能連線但沒動作」）**：MoYu 金鑰用的是「名稱推導的偽 MAC」
+  （固定前綴 `CF:30:16:…`，csTimer 同源），不是真實藍牙 MAC。統一入口宣告三家 CIC 後，
+  `watchAdvertisements` 開始能拿到 MoYu 的**真實 MAC**，原本「廣播優先於名稱」的 fallback
+  順序讓真實 MAC 搶先 → 金鑰算錯 → 方塊連上卻不串流（Phase 2 當時沒宣告 manufacturerData、
+  廣播拿不到，才「意外正確」）。修法：MoYu fallback 改為**名稱推導優先於廣播**
+  （QiYi 相反，金鑰固定、hello 需真實 MAC，維持廣播優先）。回歸測試 +2 例
+  （`tests/moyu-driver.test.ts`：名稱可推導時走名稱、不呼叫 watchAdvertisements）。
 
 ### 3D 立體方塊 + `resetToSolved()` 入約（決策層，2026-07-13）
 

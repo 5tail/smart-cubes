@@ -244,10 +244,16 @@ export async function connectMoyuDevice(
 ): Promise<MoyuDriver> {
   const deviceName = (device.name ?? '').trim();
 
-  // MAC 為金鑰推導必需（SPEC §7）：macProvider 記住的值 → 廣播資料 → 名稱推導 → macProvider 手動輸入。
+  // MAC 為金鑰推導必需（SPEC §7）。
+  // ⚠️ MoYu 金鑰用的是「名稱推導的偽 MAC」（固定前綴 CF:30:16:…，csTimer 同源），
+  //    不是真實藍牙 MAC —— 故名稱推導必須**優先於廣播**。
+  //    （統一選擇視窗 connectSmartCube 會宣告三家 CIC，使 watchAdvertisements 能拿到
+  //    MoYu 的真實 MAC；若讓真實 MAC 搶先，金鑰會算錯 → 方塊連上卻不串流。QiYi 相反：
+  //    金鑰固定、hello 需真實 MAC，故 QiYi 仍廣播優先。）
+  // 順序：macProvider 記住值 → 名稱推導偽 MAC → 廣播（名稱無法推導時的兜底）→ macProvider 手動。
   let mac = (options.macProvider && (await options.macProvider(device, false))) || null;
-  if (!mac) mac = await readMacFromAdvertisement(device);
   if (!mac) mac = defaultMacFromName(deviceName);
+  if (!mac) mac = await readMacFromAdvertisement(device);
   if (!mac && options.macProvider) mac = await options.macProvider(device, true);
   if (!mac) throw new Error('MoYu 方塊需要 MAC address 推導金鑰，且無法自動取得');
 
