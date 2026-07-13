@@ -5,6 +5,21 @@
 
 ## [Unreleased]
 
+### 統一選擇視窗（SPEC 3.1 補完，決策層 2026-07-13）
+
+- **`connectSmartCube()` 改為三家並陳的單一選擇視窗**：`src/core/chooser.ts` 組出涵蓋三家的
+  `requestDevice` 參數（名稱前綴 filters、GAN Gen2/3/4 + QiYi + MoYu services、CIC 聯集），
+  依裝置名稱前綴分派品牌（實作方式見 SPEC §5 ADR 2026-07-13）。
+- **GAN 分派**：gan-web-bluetooth 的 `connectGanCube` 自帶 requestDevice、吃不下外部裝置，
+  以 `withRequestDeviceOverride`（呼叫期間暫時覆寫、finally 還原）注入已選裝置，不 fork 上游。
+- **QiYi / MoYu 抽出 `connect*Device(device, options)`**（接受已選裝置）；原 `connect*Cube()`
+  專用入口保留，單品牌下游仍可 tree-shake。
+- demo 三顆連線按鈕收斂為一顆「🔗 連線方塊（GAN / QiYi / MoYu）」。
+- 測試 +9 例（`tests/chooser.test.ts`）：品牌偵測、requestDevice 參數聯集、
+  覆寫/還原/拋錯還原。
+- 註：GAN 首連仍需 MAC（開實驗旗標自動抓，或輸入一次後由 demo 記住）——Web Bluetooth
+  刻意不給網頁 MAC，且 GAN 裝置名稱不含 MAC（QiYi/MoYu 有），詳見 ADR。
+
 ### 3D 立體方塊 + `resetToSolved()` 入約（決策層，2026-07-13）
 
 四項決策已寫入 SPEC §5 ADR（2026-07-13 四條），本節為實作記錄：

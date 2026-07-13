@@ -87,12 +87,13 @@ console.log(cube.brand);    // 'gan' | 'moyu' | 'qiyi'
 console.log(cube.deviceName);
 ```
 
-**品牌偵測規則**（藍牙裝置名稱前綴）：
+**品牌偵測規則**（藍牙裝置名稱前綴；2026-07-13 依實機確認定案）：
 - `GAN`、`MG`、`AiCube` → GAN driver
-- `QY-QYSC` → QiYi driver
-- 魔域前綴 → MoYu driver（實作時以 csTimer 的 namePrefix 清單為準逐一確認）
+- `QY-QYSC`、`XMD-TornadoV4` → QiYi driver
+- `WCU_MY3` → MoYu driver（WeiLong AI；其他代號待實機確認後擴充）
 
 `navigator.bluetooth.requestDevice` 的 filters 要一次涵蓋三家的名稱前綴與 service UUID，讓使用者在單一選擇視窗看到所有支援的方塊。
+（✅ 已於 2026-07-13 實作：`src/core/chooser.ts` + `connect.ts`，實作方式見第 5 節 ADR。）
 
 ### 3.2 統一事件
 
@@ -205,6 +206,21 @@ const elapsedMs = fitter.fit(startCubeTs, endCubeTs);
      重置後引入自報/重建之爭。
 - **代價**：MoYu 若 BLE 掉包超過移動封包內建歷史長度，重建可能漂移且不再能靠自報狀態自動復原
   （記 BACKLOG：必要時提供顯式 `recoverState()`；實務上移動封包帶多步歷史，短暫掉包可自癒）。
+
+### ADR 2026-07-13 — 統一選擇視窗（SPEC 3.1）實作方式
+
+- **決定**：`connectSmartCube()` 依 3.1 合約改為三家並陳的單一選擇視窗：自建 `requestDevice`
+  （filters = 三家名稱前綴聯集；optionalServices = GAN Gen2/3/4 + QiYi + MoYu；
+  optionalManufacturerData = 三家 CIC 聯集），依裝置名稱前綴分派品牌。
+- **GAN 分派技法**：gan-web-bluetooth 的 `connectGanCube()` 內部自帶 `requestDevice`、
+  吃不下外部已選裝置。不 fork 上游、不重寫 GAN 協議，改在呼叫期間**暫時覆寫**
+  `navigator.bluetooth.requestDevice` 回傳已選裝置、`finally` 還原（`withRequestDeviceOverride`，
+  有覆寫/還原/拋錯還原的單元測試）。若上游未來開放傳入 device，屆時移除此 shim。
+- **QiYi / MoYu**：抽出 `connectQiyiDevice` / `connectMoyuDevice`（接受已選裝置），
+  原 `connect*Cube()` 專用入口保留 —— 單品牌下游可 tree-shake，不被統一入口拖進三家程式碼。
+- **GAN MAC 限制不變**：Web Bluetooth 刻意不給網頁 MAC；GAN 裝置名稱不含 MAC（QiYi/MoYu 有，
+  故可名稱推導）。GAN 首連仍需「開實驗旗標自動抓」或「手動輸入一次 + app 記住」；
+  真零設定需桌面 App（Phase 4 週賽專案再議）。
 
 ---
 

@@ -227,14 +227,21 @@ async function readMacFromAdvertisement(device: BluetoothDevice): Promise<string
 
 /**
  * 連線 MoYu 智能方塊：跳出僅含 MoYu filters 的藍牙選擇視窗，連線後回傳 MoyuDriver。
- *
- * 註：SPEC 3.1 的「三家並陳單一選擇視窗」為決策層待辦（見 BACKLOG）；本函式為 MoYu 專用入口。
+ * 統一選擇視窗（SPEC 3.1）請用 `connectSmartCube()`；本函式為 MoYu 專用入口（可 tree-shake）。
  */
 export async function connectMoyuCube(options: ConnectOptions = {}): Promise<MoyuDriver> {
   const device = await navigator.bluetooth.requestDevice({
     filters: MOYU_NAME_PREFIXES.map((namePrefix) => ({ namePrefix })),
     optionalServices: [MOYU_SERVICE_UUID],
   });
+  return connectMoyuDevice(device, options);
+}
+
+/** 對「已選好的裝置」建立 MoYu 連線（統一選擇視窗 connectSmartCube 的分派目標）。 */
+export async function connectMoyuDevice(
+  device: BluetoothDevice,
+  options: ConnectOptions = {},
+): Promise<MoyuDriver> {
   const deviceName = (device.name ?? '').trim();
 
   // MAC 為金鑰推導必需（SPEC §7）：macProvider 記住的值 → 廣播資料 → 名稱推導 → macProvider 手動輸入。

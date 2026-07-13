@@ -33,7 +33,7 @@ npm install maru-smartcube
 import { connectSmartCube } from 'maru-smartcube';
 
 // 點按鈕觸發（Web Bluetooth 必須由使用者手勢啟動）
-const cube = await connectSmartCube();          // 跳出瀏覽器藍牙選擇視窗 → 選 GAN 方塊
+const cube = await connectSmartCube();          // 單一藍牙視窗：GAN / QiYi / MoYu 都在裡面
 cube.addEventListener('move', (e) => {
   const { move, cubeTimestamp, hostTimestamp } = (e as CustomEvent).detail;
   console.log(move, cubeTimestamp, hostTimestamp); // 例："R'" 12345 6789.0
@@ -44,7 +44,9 @@ cube.addEventListener('facelets', (e) =>
 await cube.requestState();                       // 主動要一次目前狀態
 ```
 
-QiYi / MoYu 各有專用連線入口（filters 不同，故目前分開；三家並陳單一視窗為決策層待辦）：
+`connectSmartCube()` 會依裝置名稱前綴自動判斷品牌並分派 driver（`GAN`/`MG`/`AiCube` → GAN、
+`QY-QYSC`/`XMD-TornadoV4` → QiYi、`WCU_MY3` → MoYu）。只支援單一品牌的下游可改用專用入口，
+打包時不會帶進其他兩家的程式碼（tree-shake）：
 
 ```ts
 import { connectQiyiCube, connectMoyuCube } from 'maru-smartcube';
@@ -70,9 +72,9 @@ const moyu = await connectMoyuCube();
 
 | 匯出 | 型別 | 用途 |
 |------|------|------|
-| `connectSmartCube(options?)` | `Promise<SmartCube>` | GAN 連線入口（SPEC 3.1） |
-| `connectQiyiCube(options?)` | `Promise<SmartCube>` | QiYi 連線入口 |
-| `connectMoyuCube(options?)` | `Promise<SmartCube>` | MoYu 連線入口 |
+| `connectSmartCube(options?)` | `Promise<SmartCube>` | 統一連線入口（SPEC 3.1）：單一視窗涵蓋三家，依名稱前綴自動分派 |
+| `connectQiyiCube(options?)` | `Promise<SmartCube>` | QiYi 專用入口（可 tree-shake） |
+| `connectMoyuCube(options?)` | `Promise<SmartCube>` | MoYu 專用入口（可 tree-shake） |
 | `createTimestampFitter()` | `TimestampFitter` | 用最小平方法線性回歸校正方塊時鐘漂移，還原真實耗時（週賽防作弊核心） |
 
 `SmartCube` 介面：
@@ -197,7 +199,7 @@ npm install maru-smartcube
 import { connectSmartCube } from 'maru-smartcube';
 
 // Must be triggered by a user gesture (Web Bluetooth requirement)
-const cube = await connectSmartCube();          // opens the browser BT chooser → pick a GAN cube
+const cube = await connectSmartCube();          // one BT chooser for GAN / QiYi / MoYu
 cube.addEventListener('move', (e) => {
   const { move, cubeTimestamp, hostTimestamp } = (e as CustomEvent).detail;
   console.log(move, cubeTimestamp, hostTimestamp); // e.g. "R'" 12345 6789.0
@@ -208,8 +210,10 @@ cube.addEventListener('facelets', (e) =>
 await cube.requestState();
 ```
 
-QiYi / MoYu have dedicated entry points (their BT filters differ, so they are separate
-for now; a single combined chooser is a design-owner TODO):
+`connectSmartCube()` detects the brand from the device-name prefix and dispatches to the
+right driver (`GAN`/`MG`/`AiCube` → GAN, `QY-QYSC`/`XMD-TornadoV4` → QiYi, `WCU_MY3` → MoYu).
+Single-brand apps can use the dedicated entry points instead, which tree-shake the other
+two drivers away:
 
 ```ts
 import { connectQiyiCube, connectMoyuCube } from 'maru-smartcube';
@@ -235,9 +239,9 @@ Use `cube.addEventListener(type, handler)`; the payload is on `(e as CustomEvent
 
 | Export | Type | Purpose |
 |--------|------|---------|
-| `connectSmartCube(options?)` | `Promise<SmartCube>` | GAN entry point |
-| `connectQiyiCube(options?)` | `Promise<SmartCube>` | QiYi entry point |
-| `connectMoyuCube(options?)` | `Promise<SmartCube>` | MoYu entry point |
+| `connectSmartCube(options?)` | `Promise<SmartCube>` | Unified entry point (single chooser covering all three brands, auto brand detection) |
+| `connectQiyiCube(options?)` | `Promise<SmartCube>` | QiYi-only entry point (tree-shakable) |
+| `connectMoyuCube(options?)` | `Promise<SmartCube>` | MoYu-only entry point (tree-shakable) |
 | `createTimestampFitter()` | `TimestampFitter` | Least-squares linear fit that cancels cube-clock drift to recover true solve time (anti-cheat core for online comps) |
 
 ```ts

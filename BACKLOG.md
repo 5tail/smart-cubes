@@ -6,7 +6,9 @@
 ## 待辦（依 SPEC Phase 排入）
 
 - [x] Phase 1：GAN driver — 包裝 `gan-web-bluetooth`，RxJS → `CubeEvent`；demo 接真方塊、2D 展開圖、電量。（實機驗收待五尾）
-- [ ] **決策層**：多品牌單一選擇視窗（SPEC 3.1「filters 一次涵蓋三家」）。三家 driver 皆已就緒，各有專用入口 `connectSmartCube`(GAN) / `connectQiyiCube` / `connectMoyuCube`。整合障礙：gan-web-bluetooth 自帶 `requestDevice`（僅 GAN filters），無法接收外部已選裝置；三家並陳需決策層決定整合方式（自建涵蓋三家 filters 的 `requestDevice` 後依名稱前綴分派，GAN 分支如何交由 gan-web-bluetooth 連線既有裝置待評估）。此為公開 API 形狀決策，執行層不自行決定。
+- [x] **決策層**：多品牌單一選擇視窗（SPEC 3.1）已於 2026-07-13 定案並實作：自建涵蓋三家 filters 的
+      `requestDevice` 後依名稱前綴分派；GAN 分支以「呼叫期間暫時覆寫 requestDevice 注入已選裝置」
+      交由 gan-web-bluetooth 連線（見 SPEC §5 ADR）。若上游未來開放傳入 device，移除該 shim。
 - [x] Phase 2：QiYi + MoYu driver — 由 csTimer 移植（`qiyicube.js` / `moyu32cube.js`），fixture 測試覆蓋解密/解析；QiYi ACK 邏輯進 driver。共用 `utils/crypto.ts`(AES-128) 與 `utils/facelets.ts`(CubieCube)。（實機驗收待五尾）
 - [x] MAC 記憶（localStorage，SPEC §7 第二層）+ 友善引導對話框（demo）；driver MAC fallback 順序對齊 `gan-web-bluetooth`。GAN 首次一次性輸入後即記住。
 - [ ] **決策層**：MAC 記憶要不要進「套件層」（目前只在 demo）。套件保持純粹、把儲存交給 app（macProvider）是刻意選擇；若未來多個下游都要記憶，再評估是否提供內建 localStorage 版。
