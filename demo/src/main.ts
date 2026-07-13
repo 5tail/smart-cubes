@@ -3,6 +3,7 @@
 //
 // 直接引用套件原始碼（單一事實來源）；Phase 3 發佈後 demo 會改為 import 已發佈套件。
 import { connectSmartCube, setCapture, getCaptured } from '../../src/index';
+import { unifiedRequestDeviceOptions } from '../../src/core/chooser';
 import type { CubeEvent, SmartCube } from '../../src/core/types';
 import { CubieCube, moveCube, moveStringToIndex } from '../../src/utils/facelets';
 import { renderFacelets, renderSolved } from './cubeMap';
@@ -457,8 +458,9 @@ diagnoseBtn.addEventListener('click', async () => {
     const device = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: 'XMD-TornadoV4' }, { namePrefix: 'QY-QYSC' }, { namePrefix: 'WCU_MY3' }],
       optionalServices: KNOWN_SERVICES,
-      // 宣告 QiYi 製造商 ID，Chrome 才會在廣播中交出 manufacturer data（含真實 MAC）。
-      optionalManufacturerData: [0x0504],
+      // 必須宣告三家製造商 ID，Chrome 才會在廣播中交出 manufacturer data（含真實 MAC）。
+      // 先前只宣告 QiYi 0x0504 → MoYu/GAN 的廣播資料被 Chrome 濾掉，診斷抓不到魔域真 MAC。
+      optionalManufacturerData: unifiedRequestDeviceOptions().optionalManufacturerData,
     });
     report.deviceName = device.name;
     report.deviceId = device.id;
