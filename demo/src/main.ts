@@ -32,6 +32,10 @@ const macCancelBtn = document.querySelector<HTMLButtonElement>('#mac-cancel')!;
 const recordBtn = document.querySelector<HTMLButtonElement>('#record-btn')!;
 const downloadBtn = document.querySelector<HTMLButtonElement>('#download-btn')!;
 const diagnoseBtn = document.querySelector<HTMLButtonElement>('#diagnose-btn')!;
+const gyroControls = document.querySelector<HTMLDivElement>('#gyro-controls')!;
+const gyroBtn = document.querySelector<HTMLButtonElement>('#gyro-btn')!;
+const gyroCalibrateBtn = document.querySelector<HTMLButtonElement>('#gyro-calibrate-btn')!;
+const gyroHint = document.querySelector<HTMLSpanElement>('#gyro-hint')!;
 
 renderSolved(mapEl);
 const cube3d = createCube3d(cube3dEl);
@@ -41,6 +45,7 @@ const VIEW_KEY = 'maru-smartcube:view';
 function setView(view: '2d' | '3d'): void {
   cube3dEl.hidden = view !== '3d';
   mapEl.hidden = view !== '2d';
+  gyroControls.hidden = view !== '3d'; // gyro 姿態只對 3D 有意義
   view3dBtn.classList.toggle('active', view === '3d');
   view2dBtn.classList.toggle('active', view === '2d');
   try {
@@ -52,6 +57,28 @@ function setView(view: '2d' | '3d'): void {
 view3dBtn.addEventListener('click', () => setView('3d'));
 view2dBtn.addEventListener('click', () => setView('2d'));
 setView(localStorage.getItem(VIEW_KEY) === '2d' ? '2d' : '3d');
+
+// --- 陀螺儀姿態（僅 GAN 有 gyro 事件；SPEC §5 ADR 2026-07-13）---
+let gyroOn = false;
+function setGyroAvailable(available: boolean): void {
+  gyroBtn.disabled = !available;
+  if (!available && gyroOn) toggleGyro(false); // 斷線/換非 GAN 方塊時關閉
+  gyroHint.textContent = available
+    ? gyroOn
+      ? '轉動手上的方塊，3D 會跟著翻；按「校正正面」可歸正'
+      : '開啟後 3D 方塊會跟著實體翻轉'
+    : '僅 GAN 方塊支援陀螺儀姿態';
+}
+function toggleGyro(on: boolean): void {
+  gyroOn = on;
+  cube3d.setGyroMode(on);
+  gyroBtn.classList.toggle('active', on);
+  gyroBtn.textContent = on ? '🧭 陀螺儀姿態（開）' : '🧭 陀螺儀姿態';
+  gyroCalibrateBtn.hidden = !on;
+  setGyroAvailable(!gyroBtn.disabled);
+}
+gyroBtn.addEventListener('click', () => toggleGyro(!gyroOn));
+gyroCalibrateBtn.addEventListener('click', () => cube3d.calibrate());
 
 // --- 瀏覽器支援偵測（SPEC §7）---
 if (!('bluetooth' in navigator)) {
@@ -100,6 +127,11 @@ let recordedEvents: CubeEvent[] | null = null;
 
 // 依 CubeEvent 更新畫面（log + 2D 圖 + 電量），真假資料共用。
 function handleEvent(event: CubeEvent): void {
+  // gyro 為高頻事件：只驅動 3D 姿態，不進事件 log（避免洗版）。
+  if (event.type === 'gyro') {
+    cube3d.setOrientation(event.quaternion);
+    return;
+  }
   appendEvent(event);
   if (recordedEvents !== null) recordedEvents.push(event);
   // facelets 為權威狀態（2D 直接重繪、3D snap）；move 只驅動 3D 轉層動畫（ADR 2026-07-13）。
@@ -158,6 +190,7 @@ function teardown(): void {
   }
   deviceNameEl.textContent = '';
   setConnected(false, '未連線');
+  setGyroAvailable(false); // 斷線：停用陀螺儀（若開著會一併關閉）
 }
 
 // --- MAC 記憶（SPEC §7 三層 fallback 的 localStorage 層）+ 友善輸入對話框 ---
@@ -275,6 +308,7 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
     }
     deviceNameEl.textContent = `已連線：${cube.deviceName}（${cube.brand}）`;
     setConnected(true, '已連線');
+    setGyroAvailable(cube.brand === 'gan'); // 只有 GAN 會投遞 gyro 事件
     await cube.requestBattery();
     await cube.requestState();
   } catch (err) {

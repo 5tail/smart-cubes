@@ -5,6 +5,22 @@
 
 ## [Unreleased]
 
+### 陀螺儀 3D 姿態（demo，決策層 2026-07-13）
+
+- **3D 方塊跟著實體翻轉**：GAN `gyro` 事件的 quaternion 驅動 3D 方塊姿態（純 CSS `matrix3d`，
+  零依賴；決策見 SPEC §5 ADR 2026-07-13）。套件層對 gyro 仍只透傳不解讀，消費全在 demo。
+- **座標對齊**（最易翻車處）：GAN 右手系 +X=R/+Y=B/+Z=U → 本專案 3D 座標 +X=R/+Y=U/+Z=F，
+  差固定基變換（繞 X −90°）。`demo/src/cube3dMap.ts` 新增四元數代數（乘積/共軛/正規化）、
+  GAN→方塊座標基變換、四元數→3×3 矩陣→CSS matrix3d（含 y-down 鏡射）與「校正基準」轉換。
+- **UI**：3D 面板加「🧭 陀螺儀姿態」開關（僅連 GAN 啟用）+「校正正面」按鈕。開啟時方塊朝向
+  由陀螺儀驅動、手動拖曳環視停用、當前姿態設為正面基準；QiYi/MoYu 無 gyro 事件故停用開關；
+  2D 檢視時整列隱藏。gyro 為高頻事件，只驅動姿態、不進事件 log。
+- 測試 +9 例（`tests/gyro-orientation.test.ts`）：四元數 q⊗q⁻¹=identity、GAN 各軸基變換映射、
+  繞 U 軸 90°、identity→單位 matrix3d、校正後回正不變式。Playwright 另驗 UI 接線
+  （控制列顯隱、開關切換使方塊 transform 由 orbit 轉為 matrix3d）。
+- 驗收：111 例測試綠燈（+9）；套件與 demo typecheck/build 通過。**實機姿態手感待五尾**
+  （GAN 方塊在手上翻轉，確認 3D 跟隨方向正確、校正歸正符合直覺）。
+
 ### 統一選擇視窗（SPEC 3.1 補完，決策層 2026-07-13）
 
 - **`connectSmartCube()` 改為三家並陳的單一選擇視窗**：`src/core/chooser.ts` 組出涵蓋三家的

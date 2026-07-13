@@ -15,7 +15,10 @@ import {
   cubieToFacelet,
   moveToRotation,
   inMoveLayer,
+  ganQuatToCssTransform,
+  QUAT_IDENTITY,
   type Vec3,
+  type Quat,
 } from './cube3dMap';
 
 const CUBIE = 46; // px：單一 cubie 邊長
@@ -43,6 +46,12 @@ export interface Cube3d {
   setFacelets(facelets: string): void;
   /** move 事件：轉層動畫 + 本地預測。 */
   applyMove(move: string): void;
+  /** gyro 事件：更新方塊姿態（僅 gyro 模式時會反映到畫面）。 */
+  setOrientation(quaternion: Quat): void;
+  /** 切換 gyro 姿態模式：on 時方塊朝向由 setOrientation 驅動、拖曳環視停用（並把當前姿態設為基準）。 */
+  setGyroMode(on: boolean): void;
+  /** 把當前姿態設為「正面」基準（gyro 模式下按下即回正）。 */
+  calibrate(): void;
 }
 
 /** 以 CubieCube 代數把一步轉動套到 facelets；輸入非法時回傳 null。 */
@@ -107,17 +116,23 @@ export function createCube3d(root: HTMLElement): Cube3d {
   }
   paint(displayed);
 
-  // --- 視角拖曳（orbit）---
+  // --- 方塊朝向：orbit（手動拖曳環視）或 gyro（陀螺儀姿態）二選一 ---
   let pitch = -24;
   let yaw = -38;
-  function applyOrbit(): void {
-    cubeEl.style.transform = `rotateX(${pitch}deg) rotateY(${yaw}deg)`;
+  let gyroMode = false;
+  let currentQuat: Quat = QUAT_IDENTITY; // 最新 gyro 姿態（GAN 座標系）
+  let baselineQuat: Quat = QUAT_IDENTITY; // 校正基準（按「校正正面」時 = 當前姿態）
+  function applyView(): void {
+    cubeEl.style.transform = gyroMode
+      ? ganQuatToCssTransform(currentQuat, baselineQuat)
+      : `rotateX(${pitch}deg) rotateY(${yaw}deg)`;
   }
-  applyOrbit();
+  applyView();
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
   root.addEventListener('pointerdown', (e) => {
+    if (gyroMode) return; // gyro 模式下方塊朝向由陀螺儀決定，停用拖曳
     dragging = true;
     lastX = e.clientX;
     lastY = e.clientY;
@@ -129,7 +144,7 @@ export function createCube3d(root: HTMLElement): Cube3d {
     pitch = Math.max(-90, Math.min(90, pitch - (e.clientY - lastY) * 0.5));
     lastX = e.clientX;
     lastY = e.clientY;
-    applyOrbit();
+    applyView();
   });
   const endDrag = (): void => {
     dragging = false;
@@ -205,6 +220,19 @@ export function createCube3d(root: HTMLElement): Cube3d {
       logical = next;
       queue.push(move);
       pump();
+    },
+    setOrientation(quaternion: Quat): void {
+      currentQuat = quaternion;
+      if (gyroMode) applyView();
+    },
+    setGyroMode(on: boolean): void {
+      gyroMode = on;
+      if (on) baselineQuat = currentQuat; // 開啟即以當前姿態為正面基準
+      applyView();
+    },
+    calibrate(): void {
+      baselineQuat = currentQuat;
+      if (gyroMode) applyView();
     },
   };
 }

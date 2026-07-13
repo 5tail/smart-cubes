@@ -166,3 +166,98 @@ export function applyMoveGeometric(facelets: string, move: string): string | nul
   }
   return out.join('');
 }
+
+// ---------------------------------------------------------------------------
+// 陀螺儀姿態（gyro）：GAN quaternion → CSS 3D transform（demo，SPEC §5 ADR 2026-07-13）
+// ---------------------------------------------------------------------------
+//
+// GAN quaternion 座標系（gan-web-bluetooth gan-cube-protocol.ts）：右手系，
+// +X = Red(R 面)、+Y = Blue(B 面)、+Z = White(U 面)。
+// 本檔方塊座標系：+X = R、+Y = U、+Z = F。兩者差一個固定基變換 C（繞 X 軸 -90°）：
+//   GAN +X(R)  → ours +X          (1,0,0)
+//   GAN +Y(B)  → ours -Z (B 面)   (0,0,-1)
+//   GAN +Z(U)  → ours +Y (U 面)   (0,1,0)
+// 旋轉 quaternion 在座標基變換下，向量部分跟著變換、純量不變：q_ours=(C·v, w)。
+
+/** 單位四元數 [x, y, z, w]（w 為純量）。 */
+export type Quat = readonly [number, number, number, number];
+
+export const QUAT_IDENTITY: Quat = [0, 0, 0, 1];
+
+/** Hamilton 乘積 a ⊗ b（先做 b 再做 a 的旋轉合成）。 */
+export function quatMultiply(a: Quat, b: Quat): Quat {
+  const [ax, ay, az, aw] = a;
+  const [bx, by, bz, bw] = b;
+  return [
+    aw * bx + ax * bw + ay * bz - az * by,
+    aw * by - ax * bz + ay * bw + az * bx,
+    aw * bz + ax * by - ay * bx + az * bw,
+    aw * bw - ax * bx - ay * by - az * bz,
+  ];
+}
+
+/** 單位四元數的逆 = 共軛（向量部取負）。 */
+export function quatConjugate(q: Quat): Quat {
+  return [-q[0], -q[1], -q[2], q[3]];
+}
+
+/** 正規化為單位四元數；零向量退回 identity。 */
+export function quatNormalize(q: Quat): Quat {
+  const n = Math.hypot(q[0], q[1], q[2], q[3]);
+  if (n === 0) return QUAT_IDENTITY;
+  return [q[0] / n, q[1] / n, q[2] / n, q[3] / n];
+}
+
+/** 把 GAN 座標系的姿態四元數轉到本檔方塊座標系（基變換 C：GAN +Y→-Z、+Z→+Y）。 */
+export function ganQuatToCubeQuat(q: Quat): Quat {
+  const [x, y, z, w] = q;
+  // C·(x,y,z) = (x, z, -y)
+  return [x, z, -y, w];
+}
+
+/**
+ * 單位四元數 → 3×3 旋轉矩陣（row-major，右手系、方塊座標）。
+ * 回傳 [m00,m01,m02, m10,m11,m12, m20,m21,m22]。
+ */
+export function quatToMatrix3(q: Quat): number[] {
+  const [x, y, z, w] = quatNormalize(q);
+  const xx = x * x;
+  const yy = y * y;
+  const zz = z * z;
+  const xy = x * y;
+  const xz = x * z;
+  const yz = y * z;
+  const wx = w * x;
+  const wy = w * y;
+  const wz = w * z;
+  return [
+    1 - 2 * (yy + zz), 2 * (xy - wz), 2 * (xz + wy),
+    2 * (xy + wz), 1 - 2 * (xx + zz), 2 * (yz - wx),
+    2 * (xz - wy), 2 * (yz + wx), 1 - 2 * (xx + yy),
+  ];
+}
+
+/**
+ * 方塊座標系的姿態四元數 → CSS `matrix3d(...)` 字串。
+ * CSS 的 Y 軸朝下（螢幕座標），故對 y-up 的旋轉矩陣做鏡射共軛 M_css = S·M·S，
+ * S = diag(1,-1,1)（等效：所有含單一 y 索引的非對角項變號）。matrix3d 為 column-major。
+ */
+export function cubeQuatToCssMatrix(q: Quat): string {
+  const m = quatToMatrix3(q);
+  // S·M·S：y 列與 y 欄各變號一次 → 交叉項 m01,m10,m12,m21 變號，其餘不變。
+  const r00 = m[0]!, r01 = -m[1]!, r02 = m[2]!;
+  const r10 = -m[3]!, r11 = m[4]!, r12 = -m[5]!;
+  const r20 = m[6]!, r21 = -m[7]!, r22 = m[8]!;
+  // column-major 4×4（旋轉，無平移）。
+  const c = [r00, r10, r20, 0, r01, r11, r21, 0, r02, r12, r22, 0, 0, 0, 0, 1];
+  return `matrix3d(${c.map((n) => (Object.is(n, -0) ? 0 : Number(n.toFixed(6)))).join(', ')})`;
+}
+
+/**
+ * GAN 姿態四元數 → CSS transform，含「校正基準」：顯示 baseline 的逆乘後的相對旋轉，
+ * 故按下校正（把當前姿態設為 baseline）時方塊回正（identity）。
+ */
+export function ganQuatToCssTransform(current: Quat, baseline: Quat = QUAT_IDENTITY): string {
+  const relGan = quatMultiply(current, quatConjugate(baseline));
+  return cubeQuatToCssMatrix(ganQuatToCubeQuat(relGan));
+}
