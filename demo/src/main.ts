@@ -58,16 +58,29 @@ view3dBtn.addEventListener('click', () => setView('3d'));
 view2dBtn.addEventListener('click', () => setView('2d'));
 setView(localStorage.getItem(VIEW_KEY) === '2d' ? '2d' : '3d');
 
-// --- 陀螺儀姿態（僅 GAN 有 gyro 事件；SPEC §5 ADR 2026-07-13）---
+// --- 陀螺儀姿態（GAN 有原生 gyro 事件；QiYi/MoYu 的 gyro 封包待逆向）---
 let gyroOn = false;
+let gyroUserToggled = false; // 使用者是否手動碰過開關（碰過就不再自動開）
+let gyroSeen = false; // 本次連線是否收過 gyro 事件（診斷用）
+function updateGyroHint(): void {
+  if (gyroBtn.disabled) {
+    gyroHint.textContent = '此方塊無陀螺儀資料（目前僅 GAN 有原生 gyro；QiYi/MoYu 待逆向）';
+  } else if (!gyroSeen) {
+    gyroHint.textContent = '轉一下方塊喚醒陀螺儀…（若一直停在這句，代表沒收到 gyro 事件）';
+  } else if (gyroOn) {
+    gyroHint.textContent = '✓ 陀螺儀運作中：翻轉方塊看 3D 跟著轉，可按「校正正面」歸正';
+  } else {
+    gyroHint.textContent = '✓ 偵測到陀螺儀，點「🧭 陀螺儀姿態」啟用';
+  }
+}
 function setGyroAvailable(available: boolean): void {
   gyroBtn.disabled = !available;
-  if (!available && gyroOn) toggleGyro(false); // 斷線/換非 GAN 方塊時關閉
-  gyroHint.textContent = available
-    ? gyroOn
-      ? '轉動手上的方塊，3D 會跟著翻；按「校正正面」可歸正'
-      : '開啟後 3D 方塊會跟著實體翻轉'
-    : '僅 GAN 方塊支援陀螺儀姿態';
+  if (!available) {
+    gyroSeen = false;
+    gyroUserToggled = false;
+    if (gyroOn) toggleGyro(false); // 斷線/換非 GAN 方塊時關閉
+  }
+  updateGyroHint();
 }
 function toggleGyro(on: boolean): void {
   gyroOn = on;
@@ -75,9 +88,21 @@ function toggleGyro(on: boolean): void {
   gyroBtn.classList.toggle('active', on);
   gyroBtn.textContent = on ? '🧭 陀螺儀姿態（開）' : '🧭 陀螺儀姿態';
   gyroCalibrateBtn.hidden = !on;
-  setGyroAvailable(!gyroBtn.disabled);
+  updateGyroHint();
 }
-gyroBtn.addEventListener('click', () => toggleGyro(!gyroOn));
+// gyro 事件（高頻）：更新姿態；首次收到且使用者沒手動切換過 → 自動開啟（連上翻方塊即跟著轉）。
+function onGyro(quaternion: [number, number, number, number]): void {
+  cube3d.setOrientation(quaternion);
+  if (!gyroSeen) {
+    gyroSeen = true;
+    if (!gyroUserToggled && !gyroBtn.disabled) toggleGyro(true);
+    else updateGyroHint();
+  }
+}
+gyroBtn.addEventListener('click', () => {
+  gyroUserToggled = true;
+  toggleGyro(!gyroOn);
+});
 gyroCalibrateBtn.addEventListener('click', () => cube3d.calibrate());
 
 // --- 瀏覽器支援偵測（SPEC §7）---
@@ -129,7 +154,7 @@ let recordedEvents: CubeEvent[] | null = null;
 function handleEvent(event: CubeEvent): void {
   // gyro 為高頻事件：只驅動 3D 姿態，不進事件 log（避免洗版）。
   if (event.type === 'gyro') {
-    cube3d.setOrientation(event.quaternion);
+    onGyro(event.quaternion);
     return;
   }
   appendEvent(event);
