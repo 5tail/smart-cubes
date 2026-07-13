@@ -35,8 +35,15 @@
       QiYi 維持重送 hello（協議無 BLE 重置指令，方塊自身會追蹤實體復原）。
 - [x] **3D 立體方塊（demo）**：純 CSS 3D transforms（SPEC §5 ADR 2026-07-13），facelets 權威 +
       move 動畫，與 2D 切換並存；幾何映射有 CubieCube 交叉驗證測試。
-- [x] **陀螺儀 3D 姿態（demo）**：GAN gyro quaternion 驅動 3D 方塊即時翻轉（SPEC §5 ADR
-      2026-07-13），純 CSS matrix3d；座標對齊/校正回正有 9 例單元測。實機手感待五尾。
+- [x] **陀螺儀 3D 姿態（demo，GAN）**：GAN gyro quaternion 驅動 3D 方塊即時翻轉（SPEC §5 ADR
+      2026-07-13），純 CSS matrix3d；座標對齊/校正回正有 9 例單元測。連上 GAN 翻一下方塊即
+      **自動開啟** gyro 模式（不必先找開關），並有診斷文案顯示是否收到 gyro 事件。
+- [ ] **QiYi / MoYu 陀螺儀（需封包逆向，決策層/實機）**：使用者回報 XMD(魔方格)、WCU(魔域)
+      也有陀螺儀，但**無現成協議可移植** —— csTimer `moyu32cube.js` 只有註解掉的
+      `msgType == 171 // gyro`（封包存在但格式從未被解析）、`qiyicube.js` 完全沒有 gyro。
+      需以 demo「🔴 錄製封包」擷取「邊轉邊在空間翻動」的封包（recordPacket 已會錄下 MoYu 171
+      與 QiYi 全部封包），回傳後逆向 quaternion 的 bit layout，再於 driver 投遞 gyro 事件
+      （gyro 事件已在 CubeEvent 合約，不需改合約）。**不可憑空猜 bit layout**（無硬體驗證）。
 - [ ] MoYu 掉包超過移動封包歷史長度時，重建可能漂移；因「基準後以重建為權威」（ADR 2026-07-13），
       不再能靠方塊自報自動復原。實務上移動封包帶多步歷史可自癒短暫掉包；若實機回報漂移，
       決策層再評估顯式 `recoverState()`（重新以自報狀態為基準）。
