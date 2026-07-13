@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MoyuDriver } from '../src/drivers/moyu/MoyuDriver.js';
+import { MoyuDriver, connectMoyuDevice } from '../src/drivers/moyu/MoyuDriver.js';
 import type { CubeEvent } from '../src/core/types.js';
 import { CubieCube, moveCube, moveStringToIndex } from '../src/utils/facelets.js';
+import { defaultMacFromName } from '../src/drivers/moyu/protocol.js';
 import packets from './fixtures/moyu-packets.json' with { type: 'json' };
 
 // 以 mock BLE 物件驅動真實 MoyuDriver：餵入 csTimer 產生的加密封包（DataView），
@@ -129,5 +130,69 @@ describe('MoyuDriver', () => {
     const { driver, events } = makeDriver();
     await driver.disconnect();
     expect(events).toContainEqual({ type: 'disconnected' });
+  });
+});
+
+describe('connectMoyuDevice — MAC fallback 順序（回歸：名稱推導優先於廣播）', () => {
+  // MoYu 金鑰用「名稱推導的偽 MAC」（CF:30:16:…），不是真實藍牙 MAC。統一選擇視窗宣告三家
+  // CIC 後 watchAdvertisements 能拿到真實 MAC，若讓它搶先會算錯金鑰 → 連上不串流。此測試鎖住
+  // 「名稱可推導時一律走名稱、不碰廣播」，防止未來又把順序改回「廣播優先」。
+  function makeMockDevice(name: string): {
+    device: BluetoothDevice;
+    watchSpy: ReturnType<typeof vi.fn>;
+  } {
+    const read = new MockChrct();
+    const write = new MockChrct();
+    const service = {
+      getCharacteristic: vi.fn((uuid: string) =>
+        Promise.resolve(uuid.endsWith('cb1') ? read : write),
+      ),
+    };
+    const gatt = {
+      connect: vi.fn(() => Promise.resolve(gatt)),
+      getPrimaryService: vi.fn(() => Promise.resolve(service)),
+      disconnect: vi.fn(),
+    };
+    const watchSpy = vi.fn(() => Promise.resolve());
+    const device = new MockDevice() as unknown as BluetoothDevice & { name: string };
+    Object.assign(device, { name, gatt, watchAdvertisements: watchSpy });
+    return { device, watchSpy };
+  }
+
+  it('名稱可推導 → driver.mac = 名稱偽 MAC，且不呼叫 watchAdvertisements（不走廣播）', async () => {
+    const { device, watchSpy } = makeMockDevice('WCU_MY32_ABCD');
+    const driver = await connectMoyuDevice(device);
+    expect(driver.mac).toBe(defaultMacFromName('WCU_MY32_ABCD'));
+    expect(driver.mac).toMatch(/^CF:30:16:/); // 偽 MAC 固定前綴
+    expect(watchSpy).not.toHaveBeenCalled(); // 名稱優先 → 完全沒去抓廣播真 MAC
+    await driver.disconnect();
+  });
+
+  it('macProvider 記住值優先於名稱推導', async () => {
+    const { device } = makeMockDevice('WCU_MY32_ABCD');
+    const remembered = 'CF:30:16:00:99:88';
+    const driver = await connectMoyuDevice(device, {
+      macProvider: (_d, isFallback) => Promise.resolve(isFallback ? null : remembered),
+    });
+    expect(driver.mac).toBe(remembered);
+    await driver.disconnect();
+  });
+
+  it('名稱不可解析 → 廣播兜底仍可用（末 6 bytes 反序，與 csTimer 同）', async () => {
+    // 名稱不符 WCU_MY32_[0-9A-F]{4} → defaultMacFromName 回 null → 走廣播。
+    const { device, watchSpy } = makeMockDevice('WCU_MY32_ZZZZ');
+    const pending = connectMoyuDevice(device);
+    await new Promise((r) => setTimeout(r, 10)); // 等 readMacFromAdvertisement 掛上 listener
+    // 模擬廣播事件：CIC 0x0100 帶 6 bytes，反序讀出 cf:30:16:ab:cd:ef。
+    const dv = new DataView(new Uint8Array([0xef, 0xcd, 0xab, 0x16, 0x30, 0xcf]).buffer);
+    device.dispatchEvent(
+      Object.assign(new Event('advertisementreceived'), {
+        manufacturerData: new Map([[0x0100, dv]]),
+      }),
+    );
+    const driver = await pending;
+    expect(watchSpy).toHaveBeenCalled();
+    expect(driver.mac).toBe('cf:30:16:ab:cd:ef');
+    await driver.disconnect();
   });
 });
