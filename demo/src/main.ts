@@ -10,7 +10,9 @@ import {
   getCaptured,
 } from '../../src/index';
 import type { CubeEvent, SmartCube } from '../../src/core/types';
+import { CubieCube, moveCube, moveStringToIndex } from '../../src/utils/facelets';
 import { renderFacelets, renderSolved } from './cubeMap';
+import { createCube3d } from './cube3d';
 
 const connectBtn = document.querySelector<HTMLButtonElement>('#connect-btn')!;
 const connectQiyiBtn = document.querySelector<HTMLButtonElement>('#connect-qiyi-btn')!;
@@ -23,6 +25,9 @@ const statusEl = document.querySelector<HTMLSpanElement>('#status')!;
 const logEl = document.querySelector<HTMLOListElement>('#event-log')!;
 const supportNote = document.querySelector<HTMLParagraphElement>('#support-note')!;
 const mapEl = document.querySelector<HTMLDivElement>('#cube-map')!;
+const cube3dEl = document.querySelector<HTMLDivElement>('#cube-3d')!;
+const view3dBtn = document.querySelector<HTMLButtonElement>('#view-3d-btn')!;
+const view2dBtn = document.querySelector<HTMLButtonElement>('#view-2d-btn')!;
 const batteryEl = document.querySelector<HTMLSpanElement>('#battery')!;
 const deviceNameEl = document.querySelector<HTMLParagraphElement>('#device-name')!;
 const macDialog = document.querySelector<HTMLDialogElement>('#mac-dialog')!;
@@ -37,6 +42,24 @@ const downloadBtn = document.querySelector<HTMLButtonElement>('#download-btn')!;
 const diagnoseBtn = document.querySelector<HTMLButtonElement>('#diagnose-btn')!;
 
 renderSolved(mapEl);
+const cube3d = createCube3d(cube3dEl);
+
+// --- 2D / 3D 檢視切換（記住選擇；兩個元件都持續更新，只切顯示）---
+const VIEW_KEY = 'maru-smartcube:view';
+function setView(view: '2d' | '3d'): void {
+  cube3dEl.hidden = view !== '3d';
+  mapEl.hidden = view !== '2d';
+  view3dBtn.classList.toggle('active', view === '3d');
+  view2dBtn.classList.toggle('active', view === '2d');
+  try {
+    localStorage.setItem(VIEW_KEY, view);
+  } catch {
+    /* ignore */
+  }
+}
+view3dBtn.addEventListener('click', () => setView('3d'));
+view2dBtn.addEventListener('click', () => setView('2d'));
+setView(localStorage.getItem(VIEW_KEY) === '2d' ? '2d' : '3d');
 
 // --- 瀏覽器支援偵測（SPEC §7）---
 if (!('bluetooth' in navigator)) {
@@ -89,7 +112,12 @@ let recordedEvents: CubeEvent[] | null = null;
 function handleEvent(event: CubeEvent): void {
   appendEvent(event);
   if (recordedEvents !== null) recordedEvents.push(event);
-  if (event.type === 'facelets') renderFacelets(mapEl, event.facelets);
+  // facelets 為權威狀態（2D 直接重繪、3D snap）；move 只驅動 3D 轉層動畫（ADR 2026-07-13）。
+  if (event.type === 'facelets') {
+    renderFacelets(mapEl, event.facelets);
+    cube3d.setFacelets(event.facelets);
+  }
+  if (event.type === 'move') cube3d.applyMove(event.move);
   if (event.type === 'battery') batteryEl.textContent = `電量 ${event.level}%`;
 }
 
@@ -129,8 +157,9 @@ function onCubeEvent(e: Event): void {
       macSaved = true;
     }
   }
-  // 每次轉動主動要一次 facelets，讓 2D 圖跟上（demo 用；套件不強制）。
-  if (event.type === 'move') void cube?.requestState();
+  // 只對 GAN 每步主動要一次 facelets（GAN 不逐步回報）。MoYu/QiYi 每步已自帶 facelets 事件，
+  // 再要一次既浪費 BLE 往返，MoYu 重置後還會引來自報狀態與 driver 重建之爭（ADR 2026-07-13）。
+  if (event.type === 'move' && cube?.brand === 'gan') void cube.requestState();
   if (event.type === 'disconnected') teardown();
 }
 
@@ -275,12 +304,11 @@ disconnectBtn.addEventListener('click', async () => {
   teardown();
 });
 
-// 重置為復原（六面）。driver 提供 resetToSolved（非 SmartCube 凍結合約，故以型別守衛呼叫）。
+// 重置為復原（六面）。resetToSolved 已納入 SmartCube 凍結合約（SPEC §3.3，ADR 2026-07-13）。
 resetBtn.addEventListener('click', async () => {
-  const resettable = cube as Partial<{ resetToSolved: () => Promise<void> }> | null;
-  if (!resettable?.resetToSolved) return;
+  if (!cube) return;
   try {
-    await resettable.resetToSolved();
+    await cube.resetToSolved();
     // 各 driver 會投遞更新後的 facelets 事件，2D 圖隨之更新（不在此強制上色）。
     appendEvent({ type: 'error', error: new Error('已送出重置為復原；請確認方塊實體已復原六面。') });
   } catch (err) {
@@ -453,6 +481,7 @@ const FAKE_SOLVED =
   'UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB';
 let fakeTimer: ReturnType<typeof setInterval> | null = null;
 let fakeClock = 0;
+let fakeCubie = new CubieCube(); // 假資料也維護整顆狀態，讓 move 後跟著權威 facelets（同真 driver 行為）
 
 fakeBtn.addEventListener('click', () => {
   if (fakeTimer !== null) {
@@ -463,6 +492,7 @@ fakeBtn.addEventListener('click', () => {
     return;
   }
   fakeClock = 0;
+  fakeCubie = new CubieCube();
   setConnected(true, '已連線（假資料）');
   disconnectBtn.disabled = true; // 假資料用同一顆按鈕切換
   resetBtn.disabled = true; // 假資料無真方塊可重置
@@ -478,5 +508,9 @@ fakeBtn.addEventListener('click', () => {
       cubeTimestamp: fakeClock,
       hostTimestamp: performance.now(),
     });
+    const next = new CubieCube();
+    CubieCube.cubeMult(fakeCubie, moveCube[moveStringToIndex(move)]!, next);
+    fakeCubie = next;
+    handleEvent({ type: 'facelets', facelets: fakeCubie.toFaceCube() });
   }, 1200);
 });

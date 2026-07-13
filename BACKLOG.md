@@ -28,9 +28,14 @@
 - [x] **QiYi 重連需重整網頁**（實機回報）：根因 `watchAdvertisements` 二次呼叫失敗 → 退回錯 MAC。
       已修：driver 暴露 `mac`；demo 於**收到第一個資料事件後**才存真 MAC（不再存到「連得上卻不串流」的錯 MAC，
       這是 QY 那顆卡住的主因），重連經 `macProvider` 取回真 MAC；記住的 MAC 無法串流時 5 秒自動清除並提示重整。
-- [ ] **決策層｜介面**：把 `resetToSolved()` 正式納入 `SmartCube` 凍結合約（第 3 節）。目前三家 driver
-      已各自實作為具體方法（GAN 原生 REQUEST_RESET；MoYu 歸零重建 cubie；QiYi 無 BLE 重置指令、重送 hello 同步），
-      demo 以型別守衛呼叫。宜配合「真實立體方塊」3D 功能一併由決策層定案 method 簽名與 QiYi 是否有更佳重置法。
+- [x] **決策層｜介面**：`resetToSolved(): Promise<void>` 已於 2026-07-13 正式納入 `SmartCube`
+      凍結合約（SPEC §3.3 + §5 ADR），三家 driver 具體實作升格，demo 直接呼叫。
+      QiYi 維持重送 hello（協議無 BLE 重置指令，方塊自身會追蹤實體復原）。
+- [x] **3D 立體方塊（demo）**：純 CSS 3D transforms（SPEC §5 ADR 2026-07-13），facelets 權威 +
+      move 動畫，與 2D 切換並存；幾何映射有 CubieCube 交叉驗證測試。
+- [ ] MoYu 掉包超過移動封包歷史長度時，重建可能漂移；因「基準後以重建為權威」（ADR 2026-07-13），
+      不再能靠方塊自報自動復原。實務上移動封包帶多步歷史可自癒短暫掉包；若實機回報漂移，
+      決策層再評估顯式 `recoverState()`（重新以自報狀態為基準）。
 - [ ] demo「🔍 診斷方塊（除錯）」工具：抓廣播（含 MAC）+ 列舉 GATT 服務/特徵值/屬性/可讀值，供未來新型號分析（已就緒）。
 - [ ] MoYu 電量/資訊封包實機 fixture（本次擷取未含 0xA1/0xA4）。
 - [ ] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）。
@@ -38,4 +43,6 @@
 ## 範圍外 / 未來（不在 MVP）
 
 - 魔域各代協議差異（WeiLong AI 舊版 vs V10/V11）：以實機型號為準，其他列此。
-- 陀螺儀 3D 視覺化、更多品牌（雨花石等）、iOS（Bluefy）測試 — SPEC Phase 4。
+- 陀螺儀 3D **姿態**（gyro quaternion 讓 3D 跟著實體轉動；僅 GAN、需校正/漂移處理）、
+  更多品牌（雨花石等）、iOS（Bluefy）測試 — SPEC Phase 4。
+  （facelets 驅動的 3D 立體方塊已於 2026-07-13 提前完成，見上方。）

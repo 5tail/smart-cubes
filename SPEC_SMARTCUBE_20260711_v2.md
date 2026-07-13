@@ -119,9 +119,15 @@ interface SmartCube {
   readonly deviceName: string;
   requestState(): Promise<void>;   // 主動要求方塊回報 facelets
   requestBattery(): Promise<void>;
+  resetToSolved(): Promise<void>;  // 重置邏輯狀態為復原（六面）；2026-07-13 納入，見第 5 節 ADR
   disconnect(): Promise<void>;
 }
 ```
+
+`resetToSolved()` 語意：呼叫方宣告「實體方塊已復原」，driver 把軟體側的邏輯狀態同步為復原，
+並投遞一次 `facelets` 事件反映重置後狀態。各品牌實作：GAN 送原生 `REQUEST_RESET`；
+MoYu 無原生指令，driver 歸零內部重建狀態；QiYi 無 BLE 重置指令，重送 hello 與方塊自報狀態
+重新同步（QiYi 方塊自身會追蹤實體復原）。
 
 ### 3.4 時間校正工具（獨立匯出）
 
@@ -155,6 +161,50 @@ const elapsedMs = fitter.fit(startCubeTs, endCubeTs);
 - **選 GPL-3.0 的理由**：csTimer 是三家協議最完整、經過最多實戰驗證的實作。MIT 路線必須逐位元組 clean-room 重寫 MoYu/QiYi 協議（成本高、易出 bug）；GPL 路線可直接移植，MVP 時程約砍半，且與開源社群共生（未來社群幫忙加品牌、修韌體相容性的機會大得多）
 - **代價**：所有引用本套件的下游專案發佈時必須 GPL 相容。已確認下游只有未來的「藍牙方塊週賽」輕量專案（天生規劃為開源），comp.maru.tw 不引用本套件，故 GPL 傳染實質無痛。若未來出現無法開源的下游需求，替代方案是另做 MIT clean-room 版本（本 SPEC 的 v1 路線），成本另計
 - **對小丸號的品牌價值**：開源一個全品牌智能方塊套件，在方塊社群是強力的技術名片，與「小丸號 = 台灣方塊專業品牌」定位一致
+
+### ADR 2026-07-13 — `resetToSolved()` 納入凍結介面（第 3.3 節）
+
+- **決定**：`resetToSolved(): Promise<void>` 正式進 `SmartCube` 合約。
+- **理由**：三家 driver 已各自長出具體實作且實機驗過（GAN 原生 `REQUEST_RESET`、MoYu 歸零重建、
+  QiYi 重送 hello），demo 只能用型別守衛偷呼叫 —— 這正是「介面缺口」的訊號。未來週賽下游也
+  必需此能力（打亂前把軟體狀態對齊實體復原）。統一語意為「呼叫方宣告實體已復原」，
+  避免各 app 自行摸 driver 私有方法。
+- **代價**：合約變大一格；新增品牌 driver 必須實作（無原生指令時可比照 MoYu/QiYi 的軟體側語意）。
+
+### ADR 2026-07-13 — 3D 視覺化提前實作，仍放 demo、不進套件
+
+- **決定**：把「呈現真實立體方塊」從 Phase 4 提前到現在做；視覺化元件放 `demo/`，核心套件不含
+  任何 UI/渲染程式碼。SPEC 第 1 節「套件乾淨、可 tree-shake、零框架」不變。
+- **理由**：3D 需要的資料（`facelets` 每步整顆狀態）Phase 2 已就緒且實機驗過，提前成本低、
+  展示價值高（開源名片）。放 demo 是延續「2D 展開圖元件寫在 demo」的既有決策 —— 套件的職責是
+  協議與事件，不是渲染。
+- **範圍註記**：GAN `gyro` 陀螺儀姿態（quaternion）本輪**不用**，維持 SPEC 3.2「只透傳不使用」——
+  只有 GAN 有此事件、且需校正/漂移處理，跨品牌不一致的姿態功能留在 Phase 4。
+
+### ADR 2026-07-13 — 3D 技術選型：純 CSS 3D transforms（零依賴）
+
+- **決定**：demo 3D 用純 CSS 3D transforms（26 個 cubie div + `preserve-3d` + `rotate3d` 動畫），
+  不引入 Three.js 等 3D 函式庫。
+- **理由**：需求只是「一顆 3×3 方塊、貼紙上色、轉層動畫、拖曳環視」，遠低於 WebGL 門檻；
+  CSS 3D 零依賴、零打包成本，與 SPEC「零框架 demo」一致；Three.js（MIT，GPL 相容）帶來
+  ~600KB 依賴與 WebGL context 管理，換到的光影效果對本用途非必要。
+- **代價**：無真實光影/透視質感；若未來要做陀螺儀姿態 + 慣性動畫等進階效果，屆時再評估升級
+  Three.js（本 ADR 不擋）。
+
+### ADR 2026-07-13 — 3D 狀態模型：facelets 事件為權威、move 只驅動動畫；MoYu 以 driver 重建為權威
+
+- **決定**：
+  1. 視覺元件（2D/3D）的顯示狀態以最後一個 `facelets` 事件為權威。`move` 事件只用來驅動
+     轉層動畫與本地預測（CubieCube 代數）；當權威 facelets 與本地預測不符時，以權威覆蓋（snap）。
+  2. **MoYu**：建立基準（第一個狀態封包）後，driver 的 `facelets` 事件一律投遞「driver 以轉動
+     代數重建」的狀態；方塊自報狀態只作初始基準。理由：MoYu 方塊自身的追蹤器不知道
+     `resetToSolved()`，重置後自報狀態永遠與真實狀態差一個固定偏移，會與重建狀態打架；
+     正常操作下兩者逐步一致（`moyu-real.json` 實機交叉驗證 5/5）。
+  3. demo 只對 **GAN** 在每步 move 後 `requestState()`（GAN 不主動逐步回報 facelets）；
+     MoYu/QiYi driver 每步已自帶 facelets 事件，逐步再要一次既浪費 BLE 往返、又在 MoYu
+     重置後引入自報/重建之爭。
+- **代價**：MoYu 若 BLE 掉包超過移動封包內建歷史長度，重建可能漂移且不再能靠自報狀態自動復原
+  （記 BACKLOG：必要時提供顯式 `recoverState()`；實務上移動封包帶多步歷史，短暫掉包可自癒）。
 
 ---
 
@@ -209,7 +259,10 @@ const elapsedMs = fitter.fit(startCubeTs, endCubeTs);
 ### Phase 4（未來，不在本次範圍）
 
 - 建立獨立的「藍牙方塊週賽」輕量專案（開源，僅支援智能方塊，與 comp.maru.tw 分離不混排名）。智能方塊的逐步記錄讓防作弊成本趨近於零：打亂步驟自動驗證、成績自動判定、還原過程重播
-- 陀螺儀 3D 視覺化、更多品牌（雨花石等，歡迎社群 PR）、iOS（Bluefy）測試
+- 陀螺儀 3D **姿態**（gyro quaternion 驅動整顆方塊跟著實體轉動；僅 GAN 有資料，需校正/漂移處理）、
+  更多品牌（雨花石等，歡迎社群 PR）、iOS（Bluefy）測試
+- 註：facelets 驅動的 3D 立體方塊（貼紙上色 + 轉層動畫 + 拖曳環視）已於 2026-07-13 提前在 demo
+  實作完成（見第 5 節 ADR），此處僅剩 gyro 姿態部分
 
 ---
 

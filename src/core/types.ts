@@ -26,6 +26,10 @@ export interface SmartCube extends EventTarget {
   readonly deviceName: string;
   requestState(): Promise<void>; // 主動要求方塊回報 facelets
   requestBattery(): Promise<void>;
+  // 把「邏輯狀態」重置為復原（六面），於實體方塊已復原時呼叫，使軟體與實體同步。
+  // 各品牌語意（2026-07-13 ADR）：GAN 原生 REQUEST_RESET；MoYu 歸零 driver 重建狀態；
+  // QiYi 無 BLE 重置指令，重送 hello 與方塊自報狀態重新同步。
+  resetToSolved(): Promise<void>;
   disconnect(): Promise<void>;
 }
 

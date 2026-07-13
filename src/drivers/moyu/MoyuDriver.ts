@@ -95,11 +95,16 @@ export class MoyuDriver extends EventTarget implements SmartCube {
     switch (messageType(decoded)) {
       case OPCODE_STATE: {
         const { facelets, moveCnt } = parseState(decoded);
-        this.emit({ type: 'facelets', facelets });
-        // 僅以第一個狀態封包當作 move 計數基準（與 csTimer 一致，避免延遲封包擾亂計數）。
+        // 僅以第一個狀態封包當作基準（與 csTimer 一致，避免延遲封包擾亂計數）。
+        // 基準後以 driver 重建為權威（SPEC §5 ADR 2026-07-13）：方塊自身的追蹤器
+        // 不知道 resetToSolved()，重置後自報狀態會與重建狀態打架；正常操作下
+        // 兩者逐步一致（moyu-real fixture 交叉驗證）。
         if (this.prevMoveCnt === -1) {
           this.cubie.fromFacelet(facelets);
           this.prevMoveCnt = moveCnt;
+          this.emit({ type: 'facelets', facelets });
+        } else {
+          this.emit({ type: 'facelets', facelets: this.cubie.toFaceCube() });
         }
         break;
       }
