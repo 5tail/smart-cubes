@@ -15,7 +15,7 @@ export type CubeEvent =
     }
   | { type: 'facelets'; facelets: string } // 54 字元，Kociemba 順序 URFDLB
   | { type: 'battery'; level: number } // 0–100
-  | { type: 'gyro'; quaternion: [number, number, number, number] } // 僅 GAN，MVP 只透傳不使用
+  | { type: 'gyro'; quaternion: [number, number, number, number] } // 僅 GAN；套件層只透傳，demo 消費於 3D 姿態（§5 ADR 2026-07-13）
   | { type: 'connected' }
   | { type: 'disconnected' }
   | { type: 'error'; error: Error };
