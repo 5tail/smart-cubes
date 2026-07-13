@@ -57,6 +57,12 @@ export class GanDriver extends EventTarget implements SmartCube {
     await this.conn.sendCubeCommand({ type: 'REQUEST_BATTERY' });
   }
 
+  /** 重置方塊內部狀態為復原（六面）。GAN 有原生 REQUEST_RESET 指令；重置後再要一次 facelets 更新畫面。 */
+  async resetToSolved(): Promise<void> {
+    await this.conn.sendCubeCommand({ type: 'REQUEST_RESET' });
+    await this.conn.sendCubeCommand({ type: 'REQUEST_FACELETS' });
+  }
+
   async disconnect(): Promise<void> {
     // 主動斷線：先退訂避免重覆收到 DISCONNECT 事件，再關閉底層連線，
     // 最後自行投遞一次 disconnected。

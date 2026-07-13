@@ -25,10 +25,12 @@
 - [x] QiYi 實機封包 fixture：`tests/fixtures/qiyi-real.json`（QY-QYSC-A 實機，B U R' U' B'）。
       因金鑰固定，測試從**原始加密封包**全程重放：解密 → CRC → 解析 → ACK，並以 CubieCube
       驗證「move 套到前一 facelet = 方塊回報的下一 facelet」5/5 一致。**QiYi 實機驗收通過。**
-- [~] **QiYi 重連需重整網頁**（實機回報）：中斷後再連常不串流，重讀網頁才恢復。研判 `watchAdvertisements`
-      在同一 device 物件二次呼叫會失敗 → 退回名稱推導 MAC（可能錯）→ 不串流。**已實作修法**：
-      QiyiDriver/MoyuDriver 暴露 `mac`，demo 連上後存 localStorage，重連經 `macProvider(false)` 取回真 MAC，
-      不再每次即時抓廣播。**待五尾實機確認重連是否不必再重整。** 若仍需重整，再查 GATT/notification 重訂閱。
+- [x] **QiYi 重連需重整網頁**（實機回報）：根因 `watchAdvertisements` 二次呼叫失敗 → 退回錯 MAC。
+      已修：driver 暴露 `mac`；demo 於**收到第一個資料事件後**才存真 MAC（不再存到「連得上卻不串流」的錯 MAC，
+      這是 QY 那顆卡住的主因），重連經 `macProvider` 取回真 MAC；記住的 MAC 無法串流時 5 秒自動清除並提示重整。
+- [ ] **決策層｜介面**：把 `resetToSolved()` 正式納入 `SmartCube` 凍結合約（第 3 節）。目前三家 driver
+      已各自實作為具體方法（GAN 原生 REQUEST_RESET；MoYu 歸零重建 cubie；QiYi 無 BLE 重置指令、重送 hello 同步），
+      demo 以型別守衛呼叫。宜配合「真實立體方塊」3D 功能一併由決策層定案 method 簽名與 QiYi 是否有更佳重置法。
 - [ ] demo「🔍 診斷方塊（除錯）」工具：抓廣播（含 MAC）+ 列舉 GATT 服務/特徵值/屬性/可讀值，供未來新型號分析（已就緒）。
 - [ ] MoYu 電量/資訊封包實機 fixture（本次擷取未含 0xA1/0xA4）。
 - [ ] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）。

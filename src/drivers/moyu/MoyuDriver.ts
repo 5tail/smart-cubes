@@ -155,6 +155,16 @@ export class MoyuDriver extends EventTarget implements SmartCube {
     await this.sendRequest(OPCODE_BATTERY);
   }
 
+  /**
+   * 重置為復原（六面）。MoYu 無原生重置指令，driver 以轉動代數重建狀態，
+   * 故把內部 cubie 歸零為復原、投遞復原 facelets；請在方塊「實體已復原」時按。
+   */
+  async resetToSolved(): Promise<void> {
+    this.cubie = new CubieCube();
+    this.emit({ type: 'facelets', facelets: this.cubie.toFaceCube() });
+    return Promise.resolve();
+  }
+
   async disconnect(): Promise<void> {
     this.closed = true;
     this.chrctRead.removeEventListener('characteristicvaluechanged', this.onValueChanged);

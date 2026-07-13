@@ -16,16 +16,28 @@
 - **QiYi 實機驗收通過**：`tests/fixtures/qiyi-real.json`（QY-QYSC-A 實機封包）+
   `tests/moyu`… 風格的 `qiyi-real.test.ts`（4 例）。因奇藝金鑰固定，測試從原始加密封包
   全程重放（解密 → CRC → 解析 → ACK），並用 CubieCube 驗證 move↔facelet 內部一致 5/5。
-- 已知限制：QiYi 中斷後重連常需重整網頁才恢復串流（見 BACKLOG，建議以 localStorage 記住真 MAC 修復）。
+- 重連穩定化：QiyiDriver/MoyuDriver 暴露 `mac`，demo 於**收到第一個資料事件後**才把真 MAC
+  存進 localStorage（避免存到「連得上卻不串流」的錯 MAC）；重連經 `macProvider` 取回真 MAC，
+  不再每次即時抓廣播。若記住的 MAC 無法串流，5 秒內自動清除並提示重整。
+
+### 重置為復原 + 支援清單更正
+
+- **重置為復原（六面）**：GanDriver/QiyiDriver/MoyuDriver 新增 `resetToSolved()`（未動凍結
+  `SmartCube` 合約，供決策層日後正式納入介面）—— GAN 送原生 `REQUEST_RESET`；MoYu 將重建用的
+  `CubieCube` 歸零為復原並投遞復原 facelets；QiYi 無 BLE 重置指令，重送 hello 讓畫面與方塊同步。
+  demo 加「🔄 重置為復原」按鈕（連線後啟用）。
+- demo 支援面板與 README [已驗證型號] 更正：QiYi 三型號（QY-QYSC / Tornado V4-i / V4 LE）
+  皆改為 ✅ 實機驗收通過（先前 LE「不支援」為誤判）。
+
 ### Phase 3 — 開源收尾（文件）
 
 - **`README.md`（中英雙語）**：安裝、快速上手（十行內連上方塊）、事件與 API 表、
-  瀏覽器支援矩陣、[已驗證型號]（GAN ✅、MoYu WeiLong AI ✅、QiYi 標準版 QY-QYSC 待驗、
-  Tornado V4 LE 已知不支援）、GAN 需開 `chrome://flags` 或輸入一次 MAC 的三層 fallback 說明、致謝。
+  瀏覽器支援矩陣、[已驗證型號]（GAN ✅、MoYu WeiLong AI ✅、QiYi QY-QYSC / Tornado V4-i / V4 LE ✅
+  —— 見下方「三顆奇藝全通」的後續更正）、GAN 需開 `chrome://flags` 或輸入一次 MAC 的三層 fallback 說明、致謝。
 - **`CONTRIBUTING.md`**：如何新增品牌 driver（protocol/純函式 + Driver/BLE I/O 兩層、三條硬規則、
   移植守則）、如何用 demo 的「🔍 診斷方塊 / 🔴 錄製封包」工具擷取封包並交 fixture（含隱私：不含 MAC）。
 - **demo**：加「支援品牌與已知限制」面板（品牌狀態表 + 限制說明），footer 補 GitHub 連結與授權。
-- **npm publish 暫緩**：等 QiYi 標準版（QY-QYSC）實機驗過再發 0.1.0（見 BACKLOG）。
+- **npm publish**：三家已實機驗過，0.1.0 準備發佈（尚未上 npm；見 BACKLOG）。
 
 ### MoYu 實機驗收通過 ✅（WeiLong AI / WCU_MY32）
 

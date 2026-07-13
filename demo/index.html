@@ -19,6 +19,7 @@
         <button id="connect-btn" type="button">連線 GAN 方塊</button>
         <button id="connect-qiyi-btn" type="button">連線 QiYi 方塊</button>
         <button id="connect-moyu-btn" type="button">連線 MoYu 方塊</button>
+        <button id="reset-btn" type="button" disabled>🔄 重置為復原（六面）</button>
         <button id="disconnect-btn" type="button" disabled>中斷連線</button>
         <button id="fake-btn" type="button" class="ghost">沒有方塊？看假資料</button>
         <span id="status" class="status">未連線</span>
@@ -110,13 +111,13 @@
             </tr>
             <tr>
               <td>QiYi 奇藝</td>
-              <td>QiYi AI 3x3 標準版（<code>QY-QYSC</code>）</td>
-              <td><span class="pending">⏳ 已實作，待實機驗證</span></td>
+              <td>QiYi AI 3x3（<code>QY-QYSC</code>）、Tornado V4-i（<code>XMD-TornadoV4-i</code>）</td>
+              <td><span class="ok">✅ 實機驗收通過</span></td>
             </tr>
             <tr>
               <td>QiYi 奇藝</td>
               <td>Tornado V4 LE（<code>XMD-TornadoV4LE</code>）</td>
-              <td><span class="bad">❌ 已知不支援</span></td>
+              <td><span class="ok">✅ 實機驗收通過</span></td>
             </tr>
           </tbody>
         </table>
@@ -126,8 +127,7 @@
           <li><strong>GAN 需要 MAC</strong>：開
             <code>chrome://flags/#enable-experimental-web-platform-features</code> 讓瀏覽器自動抓，
             或手動輸入一次（會記住這顆方塊）。</li>
-          <li><strong>QiYi 標準版尚未實機驗證</strong>，npm 0.1.0 待驗過再發；
-            Tornado V4 LE 名稱雖被辨識，但目前協議無法正確驅動。</li>
+          <li><strong>QiYi 三型號（QY-QYSC / Tornado V4-i / V4 LE）皆實機驗收通過</strong>，同一組協議。</li>
           <li>手上型號沒列到？用上方「🔍 診斷方塊 / 🔴 錄製封包」擷取封包，依
             <code>CONTRIBUTING.md</code> 回傳即可協助擴充。</li>
         </ul>
