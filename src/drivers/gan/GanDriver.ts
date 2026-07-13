@@ -17,6 +17,8 @@ import { ganEventToCubeEvent } from './mapEvent.js';
 export class GanDriver extends EventTarget implements SmartCube {
   readonly brand = 'gan' as const;
   readonly deviceName: string;
+  /** 本次連線實際使用的 MAC（gan-web-bluetooth 解析/輸入的值）；供 app 記住以利穩定重連。 */
+  readonly mac: string;
 
   private readonly conn: GanCubeConnection;
   // 用結構型別避免把 RxJS 的 Subscription 型別帶進來。
@@ -26,6 +28,7 @@ export class GanDriver extends EventTarget implements SmartCube {
     super();
     this.conn = conn;
     this.deviceName = conn.deviceName;
+    this.mac = conn.deviceMAC;
 
     this.sub = conn.events$.subscribe({
       next: (e) => {

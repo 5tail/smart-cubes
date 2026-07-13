@@ -148,8 +148,10 @@ export function parseMovePacket(decoded: readonly number[]): { moveCnt: number; 
 
 /** 由 MoYu 裝置名稱推導預設 MAC（csTimer 的名稱規則）；無法推導回傳 null。 */
 export function defaultMacFromName(deviceName: string): string | null {
-  if (/^WCU_MY32_[0-9A-F]{4}$/.exec(deviceName)) {
-    return 'CF:30:16:00:' + deviceName.slice(9, 11) + ':' + deviceName.slice(11, 13);
+  // 大小寫不敏感（csTimer 原版只收大寫；實機若回報小寫後綴不應靜默漏接）。
+  if (/^WCU_MY32_[0-9A-F]{4}$/i.exec(deviceName)) {
+    const hex = deviceName.slice(9, 13).toUpperCase();
+    return 'CF:30:16:00:' + hex.slice(0, 2) + ':' + hex.slice(2, 4);
   }
   return null;
 }

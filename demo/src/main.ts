@@ -315,23 +315,37 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
   try {
     cube = await connectFn();
     for (const t of EVENT_TYPES) cube.addEventListener(t, onCubeEvent);
-    // 若這次用了記住的 MAC，卻幾秒內都沒收到資料 → 那個 MAC 可能是壞的（例如舊版存到的錯值），
-    // 清掉它，下次連線就會改走廣播重抓真 MAC。
+    // MAC 診斷資訊（QiYi/MoYu/GAN driver 皆暴露 mac；QiYi/MoYu 另有來源）。
+    const diag = cube as Partial<{ mac: string; macSource: string }>;
+    const SOURCE_LABEL: Record<string, string> = {
+      app: '記住值',
+      name: '名稱推導',
+      advertisement: '廣播',
+      manual: '手動輸入',
+      unknown: '不明',
+    };
+    const macInfo = diag.mac
+      ? ` · MAC ${diag.mac}${diag.macSource ? `（${SOURCE_LABEL[diag.macSource] ?? diag.macSource}）` : ''}`
+      : '';
+    // 看門狗（所有品牌、所有 MAC 來源）：連上 6 秒沒任何資料 = 金鑰/MAC 幾乎肯定不對，
+    // 直接把用到的 MAC 與下一步顯示在 log，不再靜默。用了記住值時順便清除讓下次重抓。
     const deviceForRecovery = pendingDevice;
-    if (usedSavedMac && deviceForRecovery) {
-      window.setTimeout(() => {
-        if (!dataArrived && cube && deviceForRecovery) {
-          clearSavedMac(deviceForRecovery);
-          appendEvent({
-            type: 'error',
-            error: new Error(
-              '記住的 MAC 似乎無法串流，已清除。請「重整網頁」後再連一次 —— 會重新抓真 MAC 並記住，之後重連就不必再重整。',
-            ),
-          });
-        }
-      }, 5000);
-    }
-    deviceNameEl.textContent = `已連線：${cube.deviceName}（${cube.brand}）`;
+    const connectedCube = cube;
+    window.setTimeout(() => {
+      if (dataArrived || cube !== connectedCube) return;
+      if (usedSavedMac && deviceForRecovery) clearSavedMac(deviceForRecovery);
+      appendEvent({
+        type: 'error',
+        error: new Error(
+          `已連線 6 秒但沒收到任何資料（連電量都沒有）。本次使用 MAC ${diag.mac ?? '（不明）'}` +
+            `（來源：${SOURCE_LABEL[diag.macSource ?? 'unknown'] ?? diag.macSource}）——金鑰可能不對。` +
+            (usedSavedMac
+              ? '已清除記住的 MAC，請重整網頁再連一次。'
+              : '請把這行文字與方塊名稱回報，或用「🔍 診斷方塊」下載 JSON 回報。'),
+        ),
+      });
+    }, 6000);
+    deviceNameEl.textContent = `已連線：${cube.deviceName}（${cube.brand}）${macInfo}`;
     setConnected(true, '已連線');
     setGyroAvailable(cube.brand === 'gan'); // 只有 GAN 會投遞 gyro 事件
     await cube.requestBattery();
