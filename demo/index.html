@@ -37,10 +37,15 @@
       <section class="panels">
         <div class="panel map-panel">
           <div class="panel-head">
-            <h2>方塊狀態（2D 展開圖）</h2>
+            <h2>方塊狀態</h2>
+            <div class="view-toggle" role="group" aria-label="檢視模式">
+              <button id="view-3d-btn" type="button" class="ghost active">3D</button>
+              <button id="view-2d-btn" type="button" class="ghost">2D</button>
+            </div>
             <span id="battery" class="battery">電量 —</span>
           </div>
-          <div id="cube-map" class="cube-map" aria-label="cube state"></div>
+          <div id="cube-3d" aria-label="cube state 3d"></div>
+          <div id="cube-map" class="cube-map" aria-label="cube state" hidden></div>
           <p class="device" id="device-name"></p>
         </div>
 

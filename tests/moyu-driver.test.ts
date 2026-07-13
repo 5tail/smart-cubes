@@ -97,6 +97,34 @@ describe('MoyuDriver', () => {
     expect(events.filter((e) => e.type === 'move').length).toBe(countAfterFirst);
   });
 
+  it('基準後的狀態封包以 driver 重建為權威（SPEC §5 ADR 2026-07-13）', () => {
+    const { read, events } = makeDriver();
+    read.notify(packets.state.enc); // 基準：solved
+    read.notify(packets.move.enc); // R U F'
+    read.notify(packets.state.enc); // 方塊自報 solved（不知道已轉動/重置的情境模擬）
+    const faceletEvents = events.filter((e) => e.type === 'facelets');
+    const last = faceletEvents[faceletEvents.length - 1];
+    // 重建狀態（R U F'）勝出，不吐方塊自報的 solved。
+    expect(last).toEqual({ type: 'facelets', facelets: faceletAfter(['R', 'U', "F'"]) });
+  });
+
+  it('resetToSolved 歸零重建並投遞復原 facelets；其後狀態封包不打架', async () => {
+    const { driver, read, events } = makeDriver();
+    read.notify(packets.state.enc);
+    read.notify(packets.move.enc); // R U F'
+    await driver.resetToSolved();
+    const afterResetEvents = events.filter((e) => e.type === 'facelets');
+    const afterReset = afterResetEvents[afterResetEvents.length - 1];
+    expect(afterReset).toEqual({ type: 'facelets', facelets: new CubieCube().toFaceCube() });
+    // 重置後再收狀態封包：仍以重建（solved）為權威，畫面不被自報狀態拉走。
+    read.notify(packets.state.enc);
+    const lastEvents = events.filter((e) => e.type === 'facelets');
+    expect(lastEvents[lastEvents.length - 1]).toEqual({
+      type: 'facelets',
+      facelets: new CubieCube().toFaceCube(),
+    });
+  });
+
   it('disconnect 投遞 disconnected 並關閉 GATT', async () => {
     const { driver, events } = makeDriver();
     await driver.disconnect();

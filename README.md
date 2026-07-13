@@ -83,9 +83,13 @@ interface SmartCube extends EventTarget {
   readonly deviceName: string;
   requestState(): Promise<void>;   // 主動要求方塊回報 facelets
   requestBattery(): Promise<void>;
+  resetToSolved(): Promise<void>;  // 重置邏輯狀態為復原（六面）—— 於實體方塊已復原時呼叫
   disconnect(): Promise<void>;
 }
 ```
+
+`resetToSolved()`：呼叫方宣告「實體方塊已復原」，driver 把軟體側邏輯狀態同步為復原並投遞一次
+`facelets` 事件。GAN 用原生重置指令；MoYu 歸零 driver 重建狀態；QiYi 重送 hello 與方塊自報同步。
 
 `ConnectOptions.macProvider`（處理 Web Bluetooth 拿不到 MAC 的情況，見下）：
 
@@ -242,6 +246,7 @@ interface SmartCube extends EventTarget {
   readonly deviceName: string;
   requestState(): Promise<void>;   // ask the cube to report its facelets
   requestBattery(): Promise<void>;
+  resetToSolved(): Promise<void>;  // sync the logical state to solved — call when the physical cube IS solved
   disconnect(): Promise<void>;
 }
 

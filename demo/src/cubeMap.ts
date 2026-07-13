@@ -1,8 +1,8 @@
 // 2D 展開圖：把 Kociemba URFDLB 54 字元 facelets 畫成方塊淨圖。
 // 依 SPEC「2D 展開圖元件寫在 demo，不進套件」。
 
-// 標準 WCA 配色（U 白、R 紅、F 綠、D 黃、L 橙、B 藍）。
-const COLORS: Record<string, string> = {
+// 標準 WCA 配色（U 白、R 紅、F 綠、D 黃、L 橙、B 藍）。2D/3D 元件共用。
+export const COLORS: Record<string, string> = {
   U: '#ffffff',
   R: '#b71234',
   F: '#009b48',

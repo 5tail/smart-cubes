@@ -5,6 +5,27 @@
 
 ## [Unreleased]
 
+### 3D 立體方塊 + `resetToSolved()` 入約（決策層，2026-07-13）
+
+四項決策已寫入 SPEC §5 ADR（2026-07-13 四條），本節為實作記錄：
+
+- **`resetToSolved(): Promise<void>` 正式納入凍結 `SmartCube` 介面**（SPEC §3.3）：
+  三家 driver 既有具體實作直接升格（GAN 原生 `REQUEST_RESET`；MoYu 歸零重建；QiYi 重送 hello）。
+  demo 改為直接呼叫（移除型別守衛）。README 中英 API 區塊同步。
+- **3D 立體方塊（demo，不進套件）**：`demo/src/cube3d.ts` 純 CSS 3D transforms（零依賴）——
+  26 cubie + `preserve-3d`，貼紙上色、每步轉層動畫（快轉時自動跳過動畫）、拖曳環視；
+  與 2D 展開圖以「3D / 2D」切換並存（記住選擇）。
+  `demo/src/cube3dMap.ts` 為純幾何映射（facelet index ↔ cubie 座標/法向、WCA 轉動 → 轉層旋轉），
+  `tests/cube3d-map.test.ts`（6 例）以 CubieCube 代數為 oracle 交叉驗證 18 個基本轉動全數一致。
+- **狀態模型（ADR）**：`facelets` 事件為權威、`move` 只驅動動畫與本地預測，預測不符時以權威 snap。
+  **MoYu 建立基準後，driver 的 facelets 事件一律投遞 driver 重建狀態**（方塊自報僅作初始基準）——
+  方塊自身追蹤器不知道 `resetToSolved()`，重置後自報會與重建打架（moyu-driver 測試 +2 例）。
+  demo 僅對 GAN 每步 `requestState()`（MoYu/QiYi 每步已自帶 facelets）。
+- 假資料模式改為維護整顆狀態（CubieCube），每步 move 後投遞一致的 facelets，2D/3D 皆可預覽。
+- 陀螺儀（gyro）3D 姿態本輪不做，維持 SPEC 3.2「只透傳不使用」，留在 Phase 4。
+- 驗收：87 例測試綠燈（+8）；套件與 demo 的 typecheck/build 通過；demo 以 headless Chromium
+  實際渲染驗證（初始配色、打亂後 2D/3D 一致、拖曳環視）。
+
 ### QiYi 實機連線修復 ✅（三顆奇藝全通）
 
 - `connectQiyiCube` 的 `requestDevice` 補上 `optionalManufacturerData: QIYI_CIC_LIST`。
