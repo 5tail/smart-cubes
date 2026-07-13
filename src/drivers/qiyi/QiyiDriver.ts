@@ -170,8 +170,7 @@ async function readMacFromAdvertisement(device: BluetoothDevice): Promise<string
 
 /**
  * 連線 QiYi 智能方塊：跳出僅含 QiYi filters 的藍牙選擇視窗，連線後回傳 QiyiDriver。
- *
- * 註：SPEC 3.1 的「三家並陳單一選擇視窗」為決策層待辦（見 BACKLOG）；本函式為 QiYi 專用入口。
+ * 統一選擇視窗（SPEC 3.1）請用 `connectSmartCube()`；本函式為 QiYi 專用入口（可 tree-shake）。
  */
 export async function connectQiyiCube(options: ConnectOptions = {}): Promise<QiyiDriver> {
   const device = await navigator.bluetooth.requestDevice({
@@ -180,6 +179,14 @@ export async function connectQiyiCube(options: ConnectOptions = {}): Promise<Qiy
     // 必須宣告製造商 ID，Chrome 才會在廣播事件中交出 manufacturer data（含真實 MAC）。
     optionalManufacturerData: [...QIYI_CIC_LIST],
   });
+  return connectQiyiDevice(device, options);
+}
+
+/** 對「已選好的裝置」建立 QiYi 連線（統一選擇視窗 connectSmartCube 的分派目標）。 */
+export async function connectQiyiDevice(
+  device: BluetoothDevice,
+  options: ConnectOptions = {},
+): Promise<QiyiDriver> {
   const deviceName = (device.name ?? '').trim();
 
   // MAC fallback（SPEC §7）：macProvider 記住的值 → 廣播資料 → 名稱推導 → macProvider 手動輸入。

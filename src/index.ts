@@ -1,8 +1,8 @@
 /**
  * maru-smartcube — 通用智能方塊連線套件（公開進入點）。
  *
- * - `connectSmartCube`：GAN 連線入口（SPEC 3.1；三家並陳單一選擇視窗為決策層待辦，見 BACKLOG）。
- * - `connectQiyiCube` / `connectMoyuCube`：Phase 2 加入的 QiYi / MoYu 專用連線入口。
+ * - `connectSmartCube`：統一連線入口（SPEC 3.1）——單一選擇視窗涵蓋三家，依名稱前綴分派 driver。
+ * - `connectQiyiCube` / `connectMoyuCube`：QiYi / MoYu 專用連線入口（單品牌下游可 tree-shake）。
  * - `createTimestampFitter`：時間戳線性回歸校正（SPEC 3.4）。
  */
 

@@ -1,22 +1,14 @@
-// Phase 1 展示頁：透過套件的 connectSmartCube() 連線 GAN 真方塊，
-// 把統一 CubeEvent 呈現為：轉動記錄、2D 展開圖、電量。
+// 展示頁：透過套件的 connectSmartCube()（SPEC 3.1 統一選擇視窗，三家並陳）連線方塊，
+// 把統一 CubeEvent 呈現為：轉動記錄、2D 展開圖 / 3D 立體方塊、電量。
 //
 // 直接引用套件原始碼（單一事實來源）；Phase 3 發佈後 demo 會改為 import 已發佈套件。
-import {
-  connectSmartCube,
-  connectQiyiCube,
-  connectMoyuCube,
-  setCapture,
-  getCaptured,
-} from '../../src/index';
+import { connectSmartCube, setCapture, getCaptured } from '../../src/index';
 import type { CubeEvent, SmartCube } from '../../src/core/types';
 import { CubieCube, moveCube, moveStringToIndex } from '../../src/utils/facelets';
 import { renderFacelets, renderSolved } from './cubeMap';
 import { createCube3d } from './cube3d';
 
 const connectBtn = document.querySelector<HTMLButtonElement>('#connect-btn')!;
-const connectQiyiBtn = document.querySelector<HTMLButtonElement>('#connect-qiyi-btn')!;
-const connectMoyuBtn = document.querySelector<HTMLButtonElement>('#connect-moyu-btn')!;
 const disconnectBtn = document.querySelector<HTMLButtonElement>('#disconnect-btn')!;
 const resetBtn = document.querySelector<HTMLButtonElement>('#reset-btn')!;
 const fakeBtn = document.querySelector<HTMLButtonElement>('#fake-btn')!;
@@ -68,8 +60,6 @@ if (!('bluetooth' in navigator)) {
     '⚠️ 這個瀏覽器不支援 Web Bluetooth，無法連真方塊。請用桌機 Chrome / Edge，或 Android Chrome。' +
     '（仍可點「看假資料」預覽介面。）';
   connectBtn.disabled = true;
-  connectQiyiBtn.disabled = true;
-  connectMoyuBtn.disabled = true;
 }
 
 // --- 事件 log 呈現 ---
@@ -124,8 +114,6 @@ function handleEvent(event: CubeEvent): void {
 function setConnected(connected: boolean, label: string): void {
   const noBluetooth = !('bluetooth' in navigator);
   connectBtn.disabled = connected || noBluetooth;
-  connectQiyiBtn.disabled = connected || noBluetooth;
-  connectMoyuBtn.disabled = connected || noBluetooth;
   fakeBtn.disabled = connected;
   disconnectBtn.disabled = !connected;
   resetBtn.disabled = !connected;
@@ -296,8 +284,6 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
 }
 
 connectBtn.addEventListener('click', () => void doConnect(() => connectSmartCube({ macProvider })));
-connectQiyiBtn.addEventListener('click', () => void doConnect(() => connectQiyiCube({ macProvider })));
-connectMoyuBtn.addEventListener('click', () => void doConnect(() => connectMoyuCube({ macProvider })));
 
 disconnectBtn.addEventListener('click', async () => {
   await cube?.disconnect();
