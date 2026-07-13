@@ -43,6 +43,8 @@ export class MoyuDriver extends EventTarget implements SmartCube {
   private readonly iv: number[];
   /** 本次連線實際使用的 MAC；供 app 記住以利穩定重連。 */
   readonly mac: string;
+  /** 本次 MAC 的來源（診斷用）：app=macProvider 記住值 / name=名稱推導 / advertisement=廣播 / manual=手動。 */
+  macSource: 'app' | 'name' | 'advertisement' | 'manual' | 'unknown' = 'unknown';
   private readonly onValueChanged: (e: Event) => void;
   private readonly onGattDisconnected: () => void;
 
@@ -252,10 +254,21 @@ export async function connectMoyuDevice(
   //    但其失敗時有 wrong-key 重問機制，我們沒有）。QiYi 相反：金鑰固定、hello 需
   //    真實 MAC、名稱推導不可靠，故 QiYi 維持廣播優先。
   // 順序：macProvider 記住值 → 名稱推導 → 廣播（名稱無法推導時的兜底）→ macProvider 手動。
+  let source: MoyuDriver['macSource'] = 'unknown';
   let mac = (options.macProvider && (await options.macProvider(device, false))) || null;
-  if (!mac) mac = defaultMacFromName(deviceName);
-  if (!mac) mac = await readMacFromAdvertisement(device);
-  if (!mac && options.macProvider) mac = await options.macProvider(device, true);
+  if (mac) source = 'app';
+  if (!mac) {
+    mac = defaultMacFromName(deviceName);
+    if (mac) source = 'name';
+  }
+  if (!mac) {
+    mac = await readMacFromAdvertisement(device);
+    if (mac) source = 'advertisement';
+  }
+  if (!mac && options.macProvider) {
+    mac = await options.macProvider(device, true);
+    if (mac) source = 'manual';
+  }
   if (!mac) throw new Error('MoYu 方塊需要 MAC address 推導金鑰，且無法自動取得');
 
   const gatt = await device.gatt!.connect();
@@ -265,6 +278,7 @@ export async function connectMoyuDevice(
   await chrctRead.startNotifications();
 
   const driver = new MoyuDriver(device, chrctRead, chrctWrite, deviceName, mac);
+  driver.macSource = source;
   // 依序要求硬體資訊、初始狀態、電量（初始狀態封包提供 facelet 基準與 move 計數起點）。
   const { key, iv } = deriveKeyIv(mac);
   const aes = new Aes128(key);

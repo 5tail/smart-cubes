@@ -33,6 +33,8 @@ export class QiyiDriver extends EventTarget implements SmartCube {
   private readonly chrct: BluetoothRemoteGATTCharacteristic;
   /** 本次連線實際使用的 MAC（含由廣播取得的真值）；供 app 記住以利穩定重連。 */
   readonly mac: string;
+  /** 本次 MAC 的來源（診斷用）：app=macProvider 記住值 / advertisement=廣播 / name=名稱推導 / manual=手動。 */
+  macSource: 'app' | 'name' | 'advertisement' | 'manual' | 'unknown' = 'unknown';
   private readonly onValueChanged: (e: Event) => void;
   private readonly onGattDisconnected: () => void;
 
@@ -190,10 +192,21 @@ export async function connectQiyiDevice(
   const deviceName = (device.name ?? '').trim();
 
   // MAC fallback（SPEC §7）：macProvider 記住的值 → 廣播資料 → 名稱推導 → macProvider 手動輸入。
+  let source: QiyiDriver['macSource'] = 'unknown';
   let mac = (options.macProvider && (await options.macProvider(device, false))) || null;
-  if (!mac) mac = await readMacFromAdvertisement(device);
-  if (!mac) mac = defaultMacFromName(deviceName);
-  if (!mac && options.macProvider) mac = await options.macProvider(device, true);
+  if (mac) source = 'app';
+  if (!mac) {
+    mac = await readMacFromAdvertisement(device);
+    if (mac) source = 'advertisement';
+  }
+  if (!mac) {
+    mac = defaultMacFromName(deviceName);
+    if (mac) source = 'name';
+  }
+  if (!mac && options.macProvider) {
+    mac = await options.macProvider(device, true);
+    if (mac) source = 'manual';
+  }
   if (!mac) throw new Error('QiYi 方塊需要 MAC address 才能建立連線，且無法自動取得');
 
   const gatt = await device.gatt!.connect();
@@ -202,6 +215,7 @@ export async function connectQiyiDevice(
   await chrct.startNotifications();
 
   const driver = new QiyiDriver(device, chrct, deviceName, mac);
+  driver.macSource = source;
   // 送出 hello 開始串流（方塊會回 hello 封包，內含 facelets + battery）。
   await chrct.writeValue(new Uint8Array(buildHello(mac)).buffer);
   return driver;

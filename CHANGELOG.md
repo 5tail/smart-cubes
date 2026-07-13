@@ -5,6 +5,18 @@
 
 ## [Unreleased]
 
+### MoYu 連線診斷儀表（決策層 2026-07-13，實機仍不串流的除錯輪）
+
+- 前情：名稱優先修法部署後（Pages run#17 = main `1e5fac8`，已驗證），實機 MoYu 仍「連上但
+  零事件」。driver 資料流複查無可疑處 → 問題幾乎必在「實際採用的 MAC」，但畫面看不到。
+- **連線行顯示 MAC 與來源**：`已連線：{名稱}（{brand}）· MAC xx（記住值/名稱推導/廣播/手動）`。
+  QiyiDriver/MoyuDriver 新增 `macSource` 診斷欄位；GanDriver 補 `mac`（gan-web-bluetooth 的
+  `deviceMAC`，附帶效益：GAN 首次串流後 demo 也會記住 MAC，之後重連不再依賴旗標）。
+- **看門狗一般化**：原本只在「用了記住值」時檢查；改為所有品牌/來源連上 6 秒無資料就在
+  log 報出「使用的 MAC＋來源＋下一步指引」，不再靜默。
+- **名稱推導大小寫不敏感**：`WCU_MY32_b6ef`（小寫後綴）不再靜默漏接名稱推導而誤入廣播路徑。
+- 測試 115 例綠燈（macSource 斷言 + 小寫名稱推導 +1）。
+
 ### 陀螺儀 3D 姿態（demo，決策層 2026-07-13）
 
 - **3D 方塊跟著實體翻轉**：GAN `gyro` 事件的 quaternion 驅動 3D 方塊姿態（純 CSS `matrix3d`，
