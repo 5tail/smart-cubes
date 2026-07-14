@@ -239,37 +239,63 @@ export async function connectMoyuCube(options: ConnectOptions = {}): Promise<Moy
   return connectMoyuDevice(device, options);
 }
 
-/** 對「已選好的裝置」建立 MoYu 連線（統一選擇視窗 connectSmartCube 的分派目標）。 */
+const MOYU_VALID_TYPES = new Set([OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY, OPCODE_MOVE]);
+
+/**
+ * 用候選 MAC 推導的金鑰探測是否正確：送一個 STATE 請求（以該金鑰加密），
+ * 在 timeout 內若收到「解密後訊息型別合法」的通知即判定金鑰正確。
+ * 錯金鑰 → 方塊收不懂請求（不回）或回的封包解出垃圾型別 → 逾時回 false。
+ */
+async function probeMoyuKey(
+  chrctRead: BluetoothRemoteGATTCharacteristic,
+  chrctWrite: BluetoothRemoteGATTCharacteristic,
+  mac: string,
+  timeoutMs: number,
+): Promise<boolean> {
+  const { key, iv } = deriveKeyIv(mac);
+  const aes = new Aes128(key);
+  return new Promise<boolean>((resolve) => {
+    let done = false;
+    const finish = (ok: boolean): void => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      chrctRead.removeEventListener('characteristicvaluechanged', onValue);
+      resolve(ok);
+    };
+    const onValue = (e: Event): void => {
+      const value = (e.target as BluetoothRemoteGATTCharacteristic).value;
+      if (!value) return;
+      const raw: number[] = [];
+      for (let i = 0; i < value.byteLength; i++) raw[i] = value.getUint8(i);
+      if (MOYU_VALID_TYPES.has(messageType(decode(raw, aes, iv)))) finish(true);
+    };
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    chrctRead.addEventListener('characteristicvaluechanged', onValue);
+    void chrctWrite
+      .writeValue(new Uint8Array(encode(buildRequest(OPCODE_STATE), aes, iv)).buffer)
+      .catch(() => {});
+  });
+}
+
+/**
+ * 對「已選好的裝置」建立 MoYu 連線（統一選擇視窗 connectSmartCube 的分派目標）。
+ *
+ * MAC → 金鑰不再靠「名稱 vs 廣播誰優先」猜：連上後對每個候選 MAC 逐一探測，
+ * 用「能解出合法封包」的那組（csTimer isWrongKey 精神，自我修正）。候選順序：
+ * macProvider 記住值 → 名稱推導 → 廣播 → macProvider 手動輸入。
+ *
+ * 全部探測失敗 → **主動 disconnect 釋放 GATT**（否則方塊被死連線佔住、不再廣播、
+ * 之後就「完全連不到」），再拋出清楚錯誤。
+ *
+ * @param probeTimeoutMs 每個候選金鑰的探測逾時（測試可縮短）。
+ */
 export async function connectMoyuDevice(
   device: BluetoothDevice,
   options: ConnectOptions = {},
+  probeTimeoutMs = 900,
 ): Promise<MoyuDriver> {
   const deviceName = (device.name ?? '').trim();
-
-  // MAC 為金鑰推導必需（SPEC §7）。
-  // ⚠️ 名稱推導必須**優先於廣播**（決策層 2026-07-13 複查定案）：
-  //    名稱推導值（固定前綴 CF:30:16:…，csTimer 同式）已由實機 fixture 證實可解密；
-  //    統一選擇視窗宣告三家 CIC 後廣播路徑首次啟用，實機回報其解析值導致金鑰錯 →
-  //    連上卻零事件（可能解析到非 MAC 的 manufacturer data 封包；csTimer 雖廣播優先，
-  //    但其失敗時有 wrong-key 重問機制，我們沒有）。QiYi 相反：金鑰固定、hello 需
-  //    真實 MAC、名稱推導不可靠，故 QiYi 維持廣播優先。
-  // 順序：macProvider 記住值 → 名稱推導 → 廣播（名稱無法推導時的兜底）→ macProvider 手動。
-  let source: MoyuDriver['macSource'] = 'unknown';
-  let mac = (options.macProvider && (await options.macProvider(device, false))) || null;
-  if (mac) source = 'app';
-  if (!mac) {
-    mac = defaultMacFromName(deviceName);
-    if (mac) source = 'name';
-  }
-  if (!mac) {
-    mac = await readMacFromAdvertisement(device);
-    if (mac) source = 'advertisement';
-  }
-  if (!mac && options.macProvider) {
-    mac = await options.macProvider(device, true);
-    if (mac) source = 'manual';
-  }
-  if (!mac) throw new Error('MoYu 方塊需要 MAC address 推導金鑰，且無法自動取得');
 
   const gatt = await device.gatt!.connect();
   const service = await gatt.getPrimaryService(MOYU_SERVICE_UUID);
@@ -277,10 +303,36 @@ export async function connectMoyuDevice(
   const chrctWrite = await service.getCharacteristic(MOYU_CHRCT_WRITE);
   await chrctRead.startNotifications();
 
-  const driver = new MoyuDriver(device, chrctRead, chrctWrite, deviceName, mac);
-  driver.macSource = source;
+  const candidates: Array<{ source: MoyuDriver['macSource']; get: () => Promise<string | null> }> = [
+    { source: 'app', get: async () => (options.macProvider ? options.macProvider(device, false) : null) },
+    { source: 'name', get: async () => defaultMacFromName(deviceName) },
+    { source: 'advertisement', get: async () => readMacFromAdvertisement(device) },
+    { source: 'manual', get: async () => (options.macProvider ? options.macProvider(device, true) : null) },
+  ];
+
+  let chosenMac: string | null = null;
+  let chosenSource: MoyuDriver['macSource'] = 'unknown';
+  for (const c of candidates) {
+    const mac = await c.get();
+    if (!mac) continue;
+    if (await probeMoyuKey(chrctRead, chrctWrite, mac, probeTimeoutMs)) {
+      chosenMac = mac;
+      chosenSource = c.source;
+      break;
+    }
+  }
+  if (!chosenMac) {
+    gatt.disconnect(); // 釋放 GATT，讓方塊能再度廣播（否則下次連不到）
+    throw new Error(
+      'MoYu 連上但金鑰驗證失敗：試過名稱推導與廣播 MAC 都無法解出方塊資料。' +
+        '可能是尚未支援的韌體/型號，或需手動輸入正確 MAC。',
+    );
+  }
+
+  const driver = new MoyuDriver(device, chrctRead, chrctWrite, deviceName, chosenMac);
+  driver.macSource = chosenSource;
   // 依序要求硬體資訊、初始狀態、電量（初始狀態封包提供 facelet 基準與 move 計數起點）。
-  const { key, iv } = deriveKeyIv(mac);
+  const { key, iv } = deriveKeyIv(chosenMac);
   const aes = new Aes128(key);
   for (const opcode of [OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY]) {
     await chrctWrite.writeValue(new Uint8Array(encode(buildRequest(opcode), aes, iv)).buffer);

@@ -340,11 +340,12 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
         error: new Error(
           `已連線 6 秒但沒收到任何資料（連電量都沒有）。本次使用 MAC ${diag.mac ?? '（不明）'}` +
             `（來源：${SOURCE_LABEL[diag.macSource ?? 'unknown'] ?? diag.macSource}）——金鑰可能不對。` +
-            (usedSavedMac
-              ? '已清除記住的 MAC，請重整網頁再連一次。'
-              : '請把這行文字與方塊名稱回報，或用「🔍 診斷方塊」下載 JSON 回報。'),
+            '已自動斷線（釋放藍牙連線，避免方塊被卡住之後連不到）；請重整網頁再連一次。',
         ),
       });
+      // 關鍵：主動斷線釋放 GATT。BLE 裝置連線中不會廣播，若留著死連線，方塊之後就「完全連不到」。
+      void connectedCube.disconnect();
+      teardown();
     }, 6000);
     deviceNameEl.textContent = `已連線：${cube.deviceName}（${cube.brand}）${macInfo}`;
     setConnected(true, '已連線');
