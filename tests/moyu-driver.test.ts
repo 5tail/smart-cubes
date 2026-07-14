@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MoyuDriver, connectMoyuDevice } from '../src/drivers/moyu/MoyuDriver.js';
 import type { CubeEvent } from '../src/core/types.js';
 import { CubieCube, moveCube, moveStringToIndex } from '../src/utils/facelets.js';
-import { defaultMacFromName } from '../src/drivers/moyu/protocol.js';
 import packets from './fixtures/moyu-packets.json' with { type: 'json' };
 
 // 以 mock BLE 物件驅動真實 MoyuDriver：餵入 csTimer 產生的加密封包（DataView），
@@ -133,78 +132,85 @@ describe('MoyuDriver', () => {
   });
 });
 
-describe('connectMoyuDevice — MAC fallback 順序（回歸：名稱推導優先於廣播）', () => {
-  // MoYu 金鑰用「名稱推導的偽 MAC」（CF:30:16:…），不是真實藍牙 MAC。統一選擇視窗宣告三家
-  // CIC 後 watchAdvertisements 能拿到真實 MAC，若讓它搶先會算錯金鑰 → 連上不串流。此測試鎖住
-  // 「名稱可推導時一律走名稱、不碰廣播」，防止未來又把順序改回「廣播優先」。
-  function makeMockDevice(name: string): {
+describe('connectMoyuDevice — 金鑰自動探測（連上後試候選 MAC，用能解出合法封包的那組）', () => {
+  // 不再猜「名稱 vs 廣播誰優先」：逐一探測候選 MAC，方塊回的封包能以該金鑰解出合法型別才採用
+  // （csTimer isWrongKey 精神）。mock 方塊：任何 write 都回 fixture 的 state.enc（以 packets.mac
+  // 的金鑰加密），故只有「候選 == packets.mac 的金鑰」能通過探測。
+  // packets.mac = CF:30:16:AB:CD:EF；名稱推導 WCU_MY32_ABCD → CF:30:16:00:AB:CD（與 fixture 不同 → 探測失敗）。
+
+  function makeProbeMock(
+    name: string,
+    opts: { respond?: boolean; advDvBytes?: number[] } = {},
+  ): {
     device: BluetoothDevice;
     watchSpy: ReturnType<typeof vi.fn>;
+    disconnectSpy: ReturnType<typeof vi.fn>;
   } {
+    const respond = opts.respond ?? true;
     const read = new MockChrct();
     const write = new MockChrct();
+    write.writeValue = vi.fn(() => {
+      if (respond) queueMicrotask(() => read.notify(packets.state.enc)); // 方塊「回應」= fixture 加密封包
+      return Promise.resolve();
+    });
     const service = {
       getCharacteristic: vi.fn((uuid: string) =>
         Promise.resolve(uuid.endsWith('cb1') ? read : write),
       ),
     };
+    const disconnectSpy = vi.fn();
     const gatt = {
       connect: vi.fn(() => Promise.resolve(gatt)),
       getPrimaryService: vi.fn(() => Promise.resolve(service)),
-      disconnect: vi.fn(),
+      disconnect: disconnectSpy,
     };
-    const watchSpy = vi.fn(() => Promise.resolve());
     const device = new MockDevice() as unknown as BluetoothDevice & { name: string };
-    Object.assign(device, { name, gatt, watchAdvertisements: watchSpy });
-    return { device, watchSpy };
+    // 若給了 advDvBytes，watchAdvertisements 一被呼叫就（下一 microtask）派送廣播事件。
+    const watchSpy = vi.fn(() => {
+      if (opts.advDvBytes) {
+        queueMicrotask(() =>
+          device.dispatchEvent(
+            Object.assign(new Event('advertisementreceived'), {
+              manufacturerData: new Map([[0x0100, new DataView(new Uint8Array(opts.advDvBytes!).buffer)]]),
+            }),
+          ),
+        );
+      }
+      return Promise.resolve();
+    });
+    const base: Record<string, unknown> = { name, gatt };
+    if (opts.advDvBytes) base.watchAdvertisements = watchSpy; // 無 advDvBytes → 無此方法 → readMac 立即回 null
+    Object.assign(device, base);
+    return { device, watchSpy, disconnectSpy };
   }
 
-  it('名稱可推導 → driver.mac = 名稱偽 MAC，且不呼叫 watchAdvertisements（不走廣播）', async () => {
-    const { device, watchSpy } = makeMockDevice('WCU_MY32_ABCD');
-    const driver = await connectMoyuDevice(device);
-    expect(driver.mac).toBe(defaultMacFromName('WCU_MY32_ABCD'));
-    expect(driver.mac).toMatch(/^CF:30:16:/); // 偽 MAC 固定前綴
-    expect(driver.macSource).toBe('name');
-    expect(watchSpy).not.toHaveBeenCalled(); // 名稱優先 → 完全沒去抓廣播真 MAC
-    await driver.disconnect();
-  });
-
-  it('macProvider 記住值優先於名稱推導', async () => {
-    const { device } = makeMockDevice('WCU_MY32_ABCD');
-    const remembered = 'CF:30:16:00:99:88';
-    const driver = await connectMoyuDevice(device, {
-      macProvider: (_d, isFallback) => Promise.resolve(isFallback ? null : remembered),
-    });
-    expect(driver.mac).toBe(remembered);
+  it('記住值（app）即正確金鑰 → 直接採用，macSource=app', async () => {
+    const { device } = makeProbeMock('WCU_MY32_ABCD');
+    const driver = await connectMoyuDevice(
+      device,
+      { macProvider: (_d, fb) => Promise.resolve(fb ? null : packets.mac) },
+      50,
+    );
+    expect(driver.mac).toBe(packets.mac);
     expect(driver.macSource).toBe('app');
     await driver.disconnect();
   });
 
-  it('名稱後綴為小寫 hex 也可推導（大小寫不敏感）', async () => {
-    const { device, watchSpy } = makeMockDevice('WCU_MY32_b6ef');
-    const driver = await connectMoyuDevice(device);
-    expect(driver.mac).toBe('CF:30:16:00:B6:EF');
-    expect(driver.macSource).toBe('name');
-    expect(watchSpy).not.toHaveBeenCalled();
+  it('名稱推導金鑰錯 → 自動改用廣播 MAC（探測通過），macSource=advertisement', async () => {
+    // 廣播 dv 反序 = packets.mac；名稱推導 CF:30:16:00:AB:CD 探測失敗後改用廣播。
+    const advBytes = [0xef, 0xcd, 0xab, 0x16, 0x30, 0xcf]; // 反序讀出 cf:30:16:ab:cd:ef（= packets.mac 金鑰）
+    const { device, watchSpy } = makeProbeMock('WCU_MY32_ABCD', { advDvBytes: advBytes });
+    const driver = await connectMoyuDevice(device, {}, 30);
+    expect(driver.macSource).toBe('advertisement');
+    expect(driver.mac.toUpperCase()).toBe(packets.mac);
+    expect(watchSpy).toHaveBeenCalled();
     await driver.disconnect();
   });
 
-  it('名稱不可解析 → 廣播兜底仍可用（末 6 bytes 反序，與 csTimer 同）', async () => {
-    // 名稱不符 WCU_MY32_[0-9A-F]{4} → defaultMacFromName 回 null → 走廣播。
-    const { device, watchSpy } = makeMockDevice('WCU_MY32_ZZZZ');
-    const pending = connectMoyuDevice(device);
-    await new Promise((r) => setTimeout(r, 10)); // 等 readMacFromAdvertisement 掛上 listener
-    // 模擬廣播事件：CIC 0x0100 帶 6 bytes，反序讀出 cf:30:16:ab:cd:ef。
-    const dv = new DataView(new Uint8Array([0xef, 0xcd, 0xab, 0x16, 0x30, 0xcf]).buffer);
-    device.dispatchEvent(
-      Object.assign(new Event('advertisementreceived'), {
-        manufacturerData: new Map([[0x0100, dv]]),
-      }),
-    );
-    const driver = await pending;
-    expect(watchSpy).toHaveBeenCalled();
-    expect(driver.mac).toBe('cf:30:16:ab:cd:ef');
-    expect(driver.macSource).toBe('advertisement');
-    await driver.disconnect();
+  it('所有候選金鑰都錯 → 斷開 GATT 釋放連線並拋錯（避免方塊被卡住）', async () => {
+    // 無 macProvider、名稱推導錯、無廣播 → 全部探測失敗。
+    const { device, disconnectSpy } = makeProbeMock('WCU_MY32_ABCD');
+    await expect(connectMoyuDevice(device, {}, 20)).rejects.toThrow(/金鑰驗證失敗/);
+    expect(disconnectSpy).toHaveBeenCalled(); // 關鍵：釋放 GATT，方塊才能再度廣播
   });
 });
