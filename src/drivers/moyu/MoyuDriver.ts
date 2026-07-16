@@ -283,10 +283,10 @@ async function probeMoyuKey(
  *
  * MAC → 金鑰不再靠「名稱 vs 廣播誰優先」猜：連上後對每個候選 MAC 逐一探測，
  * 用「能解出合法封包」的那組（csTimer isWrongKey 精神，自我修正）。候選順序：
- * macProvider 記住值 → 名稱推導 → 廣播 → macProvider 手動輸入。
+ * macProvider 記住值 → 名稱推導 → 廣播（**不含手動輸入**：魔域使用者無從得知 MAC）。
  *
- * 全部探測失敗 → **主動 disconnect 釋放 GATT**（否則方塊被死連線佔住、不再廣播、
- * 之後就「完全連不到」），再拋出清楚錯誤。
+ * 探測都沒通過但至少有候選 → 用最可能的（名稱推導優先）直接連上，不跳輸入框，
+ * 交由畫面看門狗判斷是否真的沒串流。完全無候選 MAC → disconnect 釋放 GATT 再拋錯。
  *
  * @param probeTimeoutMs 每個候選金鑰的探測逾時（測試可縮短）。
  */
@@ -303,36 +303,38 @@ export async function connectMoyuDevice(
   const chrctWrite = await service.getCharacteristic(MOYU_CHRCT_WRITE);
   await chrctRead.startNotifications();
 
-  const candidates: Array<{ source: MoyuDriver['macSource']; get: () => Promise<string | null> }> = [
+  // 候選 MAC（**不含手動輸入**：魔域金鑰用推導 MAC，使用者無從得知真 MAC，跳輸入框只會困惑）。
+  const specs: Array<{ source: MoyuDriver['macSource']; get: () => Promise<string | null> }> = [
     { source: 'app', get: async () => (options.macProvider ? options.macProvider(device, false) : null) },
     { source: 'name', get: async () => defaultMacFromName(deviceName) },
     { source: 'advertisement', get: async () => readMacFromAdvertisement(device) },
-    { source: 'manual', get: async () => (options.macProvider ? options.macProvider(device, true) : null) },
   ];
 
-  let chosenMac: string | null = null;
-  let chosenSource: MoyuDriver['macSource'] = 'unknown';
-  for (const c of candidates) {
-    const mac = await c.get();
+  const resolved: Array<{ mac: string; source: MoyuDriver['macSource'] }> = [];
+  let chosen: { mac: string; source: MoyuDriver['macSource'] } | null = null;
+  for (const s of specs) {
+    const mac = await s.get();
     if (!mac) continue;
+    resolved.push({ mac, source: s.source });
     if (await probeMoyuKey(chrctRead, chrctWrite, mac, probeTimeoutMs)) {
-      chosenMac = mac;
-      chosenSource = c.source;
+      chosen = { mac, source: s.source };
       break;
     }
   }
-  if (!chosenMac) {
-    gatt.disconnect(); // 釋放 GATT，讓方塊能再度廣播（否則下次連不到）
-    throw new Error(
-      'MoYu 連上但金鑰驗證失敗：試過名稱推導與廣播 MAC 都無法解出方塊資料。' +
-        '可能是尚未支援的韌體/型號，或需手動輸入正確 MAC。',
-    );
+  if (!chosen) {
+    if (resolved.length === 0) {
+      gatt.disconnect(); // 釋放 GATT，讓方塊能再度廣播（否則下次連不到）
+      throw new Error('MoYu 方塊需要 MAC 推導金鑰，但名稱推導與廣播都無法取得。');
+    }
+    // 探測都沒通過：**不跳輸入框**，改用最可能的候選（名稱推導優先）直接連上；
+    // 若真的沒串流，畫面看門狗會 6 秒後報出並斷線 —— 那代表此韌體金鑰算法尚未支援（需錄封包逆向）。
+    chosen = resolved.find((r) => r.source === 'name') ?? resolved[0]!;
   }
 
-  const driver = new MoyuDriver(device, chrctRead, chrctWrite, deviceName, chosenMac);
-  driver.macSource = chosenSource;
+  const driver = new MoyuDriver(device, chrctRead, chrctWrite, deviceName, chosen.mac);
+  driver.macSource = chosen.source;
   // 依序要求硬體資訊、初始狀態、電量（初始狀態封包提供 facelet 基準與 move 計數起點）。
-  const { key, iv } = deriveKeyIv(chosenMac);
+  const { key, iv } = deriveKeyIv(chosen.mac);
   const aes = new Aes128(key);
   for (const opcode of [OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY]) {
     await chrctWrite.writeValue(new Uint8Array(encode(buildRequest(opcode), aes, iv)).buffer);
