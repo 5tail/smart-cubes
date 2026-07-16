@@ -32,6 +32,7 @@ const macOkBtn = document.querySelector<HTMLButtonElement>('#mac-ok')!;
 const macCancelBtn = document.querySelector<HTMLButtonElement>('#mac-cancel')!;
 const recordBtn = document.querySelector<HTMLButtonElement>('#record-btn')!;
 const downloadBtn = document.querySelector<HTMLButtonElement>('#download-btn')!;
+const copyBtn = document.querySelector<HTMLButtonElement>('#copy-btn')!;
 const diagnoseBtn = document.querySelector<HTMLButtonElement>('#diagnose-btn')!;
 const gyroControls = document.querySelector<HTMLDivElement>('#gyro-controls')!;
 const gyroBtn = document.querySelector<HTMLButtonElement>('#gyro-btn')!;
@@ -96,7 +97,9 @@ function onGyro(quaternion: [number, number, number, number]): void {
   cube3d.setOrientation(quaternion);
   if (!gyroSeen) {
     gyroSeen = true;
-    if (!gyroUserToggled && !gyroBtn.disabled) toggleGyro(true);
+    // 事件驅動啟用：只要有 gyro 事件（不限品牌）就開放開關 —— 未來 QiYi/MoYu gyro 落地時自動生效。
+    if (gyroBtn.disabled) gyroBtn.disabled = false;
+    if (!gyroUserToggled) toggleGyro(true);
     else updateGyroHint();
   }
 }
@@ -347,6 +350,8 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
       void connectedCube.disconnect();
       teardown();
     }, 6000);
+    lastCubeBrand = cube.brand;
+    lastCubeName = cube.deviceName;
     deviceNameEl.textContent = `已連線：${cube.deviceName}（${cube.brand}）${macInfo}`;
     setConnected(true, '已連線');
     setGyroAvailable(cube.brand === 'gan'); // 只有 GAN 會投遞 gyro 事件
@@ -383,14 +388,29 @@ clearBtn.addEventListener('click', () => {
 
 // --- 封包錄製（實機 fixture 擷取）---
 let recording = false;
+let recordTimer: ReturnType<typeof setInterval> | null = null;
+// 斷線 teardown 會清掉 cube，記住錄製當下的品牌/名稱讓匯出仍有標記。
+let lastCubeBrand: string | null = null;
+let lastCubeName: string | null = null;
 
 recordBtn.addEventListener('click', () => {
   recording = !recording;
   setCapture(recording); // 開啟時清空 driver 端緩衝
   recordedEvents = recording ? [] : recordedEvents;
-  recordBtn.textContent = recording ? '⏹ 停止錄製' : '🔴 錄製封包';
   recordBtn.classList.toggle('recording', recording);
-  downloadBtn.disabled = recording; // 停止後才能下載
+  downloadBtn.disabled = recording; // 停止後才能匯出
+  copyBtn.disabled = recording;
+  if (recording) {
+    // 即時封包計數：平板上不必匯出檔案，看數字就知道「方塊到底有沒有送資料」。
+    recordBtn.textContent = '⏹ 停止錄製（0 包）';
+    recordTimer = setInterval(() => {
+      recordBtn.textContent = `⏹ 停止錄製（${getCaptured().length} 包）`;
+    }, 500);
+  } else {
+    if (recordTimer !== null) clearInterval(recordTimer);
+    recordTimer = null;
+    recordBtn.textContent = `🔴 錄製封包（上次 ${getCaptured().length} 包）`;
+  }
 });
 
 // --- 診斷（未知方塊型號除錯）：抓廣播 manufacturer data（含真 MAC）+ 已授權服務的特徵值 ---
@@ -519,22 +539,39 @@ diagnoseBtn.addEventListener('click', async () => {
   URL.revokeObjectURL(url);
 });
 
-downloadBtn.addEventListener('click', () => {
+function buildCaptureDump(): { brand: string | null; json: string } {
+  const brand = cube?.brand ?? lastCubeBrand;
   const dump = {
-    brand: cube?.brand ?? null,
-    deviceName: cube?.deviceName ?? null,
+    brand,
+    deviceName: cube?.deviceName ?? lastCubeName,
     capturedAt: new Date().toISOString(),
     note: '實機封包擷取（raw=原始加密, decoded=driver 解密後）；events=demo 解出的事件。不含 MAC。',
     packets: getCaptured(),
     events: recordedEvents ?? [],
   };
-  const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+  return { brand, json: JSON.stringify(dump, null, 2) };
+}
+
+downloadBtn.addEventListener('click', () => {
+  const { brand, json } = buildCaptureDump();
+  const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `maru-capture-${dump.brand ?? 'cube'}-${Date.now()}.json`;
+  a.download = `maru-capture-${brand ?? 'cube'}-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
+});
+
+// 平板（無法下載檔案）：複製到剪貼簿，直接貼進聊天室/文件即可回傳。
+copyBtn.addEventListener('click', async () => {
+  const { json } = buildCaptureDump();
+  try {
+    await navigator.clipboard.writeText(json);
+    appendEvent({ type: 'error', error: new Error(`已複製 ${getCaptured().length} 包封包 JSON 到剪貼簿，直接貼上回傳即可。`) });
+  } catch (err) {
+    appendEvent({ type: 'error', error: new Error(`複製失敗：${err instanceof Error ? err.message : String(err)}`) });
+  }
 });
 
 // --- 假資料（無方塊時預覽介面用）---

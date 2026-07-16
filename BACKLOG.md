@@ -38,12 +38,15 @@
 - [x] **陀螺儀 3D 姿態（demo，GAN）**：GAN gyro quaternion 驅動 3D 方塊即時翻轉（SPEC §5 ADR
       2026-07-13），純 CSS matrix3d；座標對齊/校正回正有 9 例單元測。連上 GAN 翻一下方塊即
       **自動開啟** gyro 模式（不必先找開關），並有診斷文案顯示是否收到 gyro 事件。
-- [ ] **QiYi / MoYu 陀螺儀（需封包逆向，決策層/實機）**：使用者回報 XMD(魔方格)、WCU(魔域)
-      也有陀螺儀，但**無現成協議可移植** —— csTimer `moyu32cube.js` 只有註解掉的
-      `msgType == 171 // gyro`（封包存在但格式從未被解析）、`qiyicube.js` 完全沒有 gyro。
-      需以 demo「🔴 錄製封包」擷取「邊轉邊在空間翻動」的封包（recordPacket 已會錄下 MoYu 171
-      與 QiYi 全部封包），回傳後逆向 quaternion 的 bit layout，再於 driver 投遞 gyro 事件
-      （gyro 事件已在 CubeEvent 合約，不需改合約）。**不可憑空猜 bit layout**（無硬體驗證）。
+- [ ] **Tornado V4 AI 陀螺儀（需封包逆向；2026-07-13 決策層已查證）**：官方規格確認 V4 AI 有
+      高精度陀螺儀且官方 app 有 3D 姿態同步 → 資料確實經 BLE 送出。但社群協議文件
+      （Flying-Toast，寫的是無陀螺儀的 QY-QYSC）與 csTimer 皆無此格式 → 需實機封包逆向。
+      實機已確認 V4 串流正常 → 用「🔴 錄製封包」錄「整顆在空間翻動（不轉層）」約 10 秒，
+      未知 opcode 會進 raw 緩衝；平板可用「📋 複製封包」貼回。逆向出 quaternion 後在
+      QiyiDriver 投遞 gyro 事件（合約已有 gyro 事件；demo 已改成「收到 gyro 事件即啟用開關」，
+      落地後自動生效）。**不可憑空猜 bit layout**。
+- [ ] **MoYu 陀螺儀（同上，且 blocked on MoYu 串流恢復）**：csTimer `moyu32cube.js` 只有
+      註解掉的 `msgType == 171 // gyro`。待 MoYu 連線問題解決後再錄封包逆向。
 - [ ] MoYu 掉包超過移動封包歷史長度時，重建可能漂移；因「基準後以重建為權威」（ADR 2026-07-13），
       不再能靠方塊自報自動復原。實務上移動封包帶多步歷史可自癒短暫掉包；若實機回報漂移，
       決策層再評估顯式 `recoverState()`（重新以自報狀態為基準）。
