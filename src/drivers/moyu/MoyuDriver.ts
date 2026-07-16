@@ -148,8 +148,7 @@ export class MoyuDriver extends EventTarget implements SmartCube {
   }
 
   private async sendRequest(opcode: number): Promise<void> {
-    const enc = encode(buildRequest(opcode), this.aes, this.iv);
-    await this.chrctWrite.writeValue(new Uint8Array(enc).buffer);
+    await writeCommand(this.chrctWrite, encode(buildRequest(opcode), this.aes, this.iv));
   }
 
   /** 主動要求方塊回報 facelets（opcode 163）。 */
@@ -242,6 +241,26 @@ export async function connectMoyuCube(options: ConnectOptions = {}): Promise<Moy
 const MOYU_VALID_TYPES = new Set([OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY, OPCODE_MOVE]);
 
 /**
+ * 對 MoYu 寫入指令。`writeValue` 的寫入模式（with/without response）各平台實作不一
+ * （桌機/Android 可能不同），特徵值支援 writeWithoutResponse 時明確採用之，否則退回 writeValue。
+ * 疑似「桌機能動、Android 平板方塊完全沉默」的成因之一（實機 0 封包擷取，2026-07-16）。
+ */
+async function writeCommand(
+  chrct: BluetoothRemoteGATTCharacteristic,
+  bytes: readonly number[],
+): Promise<void> {
+  const buf = new Uint8Array(bytes).buffer;
+  const c = chrct as BluetoothRemoteGATTCharacteristic & {
+    writeValueWithoutResponse?: (b: BufferSource) => Promise<void>;
+  };
+  if (chrct.properties?.writeWithoutResponse && typeof c.writeValueWithoutResponse === 'function') {
+    await c.writeValueWithoutResponse(buf);
+  } else {
+    await chrct.writeValue(buf);
+  }
+}
+
+/**
  * 用候選 MAC 推導的金鑰探測是否正確：送一個 STATE 請求（以該金鑰加密），
  * 在 timeout 內若收到「解密後訊息型別合法」的通知即判定金鑰正確。
  * 錯金鑰 → 方塊收不懂請求（不回）或回的封包解出垃圾型別 → 逾時回 false。
@@ -274,9 +293,11 @@ async function probeMoyuKey(
     };
     const timer = setTimeout(() => finish(false), timeoutMs);
     chrctRead.addEventListener('characteristicvaluechanged', onValue);
-    void chrctWrite
-      .writeValue(new Uint8Array(encode(buildRequest(OPCODE_STATE), aes, iv)).buffer)
-      .catch(() => {});
+    // 照實機驗收過的握手順序：先 INFO 再 STATE（部分韌體可能要求先收到 INFO 才回話）。
+    void (async () => {
+      await writeCommand(chrctWrite, encode(buildRequest(OPCODE_INFO), aes, iv));
+      await writeCommand(chrctWrite, encode(buildRequest(OPCODE_STATE), aes, iv));
+    })().catch(() => {});
   });
 }
 
@@ -339,7 +360,7 @@ export async function connectMoyuDevice(
   const { key, iv } = deriveKeyIv(chosen.mac);
   const aes = new Aes128(key);
   for (const opcode of [OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY]) {
-    await chrctWrite.writeValue(new Uint8Array(encode(buildRequest(opcode), aes, iv)).buffer);
+    await writeCommand(chrctWrite, encode(buildRequest(opcode), aes, iv));
   }
   return driver;
 }
