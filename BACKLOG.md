@@ -38,13 +38,14 @@
 - [x] **陀螺儀 3D 姿態（demo，GAN）**：GAN gyro quaternion 驅動 3D 方塊即時翻轉（SPEC §5 ADR
       2026-07-13），純 CSS matrix3d；座標對齊/校正回正有 9 例單元測。連上 GAN 翻一下方塊即
       **自動開啟** gyro 模式（不必先找開關），並有診斷文案顯示是否收到 gyro 事件。
-- [ ] **Tornado V4 AI 陀螺儀（需封包逆向；2026-07-13 決策層已查證）**：官方規格確認 V4 AI 有
-      高精度陀螺儀且官方 app 有 3D 姿態同步 → 資料確實經 BLE 送出。但社群協議文件
-      （Flying-Toast，寫的是無陀螺儀的 QY-QYSC）與 csTimer 皆無此格式 → 需實機封包逆向。
-      實機已確認 V4 串流正常 → 用「🔴 錄製封包」錄「整顆在空間翻動（不轉層）」約 10 秒，
-      未知 opcode 會進 raw 緩衝；平板可用「📋 複製封包」貼回。逆向出 quaternion 後在
-      QiyiDriver 投遞 gyro 事件（合約已有 gyro 事件；demo 已改成「收到 gyro 事件即啟用開關」，
-      落地後自動生效）。**不可憑空猜 bit layout**。
+- [x] **Tornado V4 AI 陀螺儀封包格式已逆向（2026-07-16，決策層）**：由 XMD-TornadoV4LE-00F9
+      實機 259 包翻轉封包破解 —— `0xcc` 框架 `[cc 10 seq ts:2 ?:1 quat(4×int16 BE) crc:2]`，
+      offset 6 起四元數 norm 變異僅 0.03%、CRC16/MODBUS 259/259 全中。已在 `protocol.ts`
+      實作 `parseGyroQuaternion` + `parseCubeData` 0xcc 分支投遞 gyro 事件，fixture 測試 3 例。
+- [ ] **Tornado V4 陀螺儀座標校正（剩最後一哩）**：封包格式已鎖定、gyro 事件已流出、demo 已
+      渲染，但**四元數分量順序（哪個是 w）與座標系對映未知**（無官方文件）。目前暫用 GAN 的
+      座標轉換當初值 → 方塊會跟著動但軸向可能不對。需一次「已知動作」實機校正：請使用者做
+      指定翻轉（如白上綠前 → 整顆順時針轉 90°）並回報畫面轉向，即可一次解出分量順序 + 軸號。
 - [ ] **MoYu 陀螺儀（同上，且 blocked on MoYu 串流恢復）**：csTimer `moyu32cube.js` 只有
       註解掉的 `msgType == 171 // gyro`。待 MoYu 連線問題解決後再錄封包逆向。
 - [ ] MoYu 掉包超過移動封包歷史長度時，重建可能漂移；因「基準後以重建為權威」（ADR 2026-07-13），
