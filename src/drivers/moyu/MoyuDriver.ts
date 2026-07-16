@@ -268,7 +268,9 @@ async function probeMoyuKey(
       if (!value) return;
       const raw: number[] = [];
       for (let i = 0; i < value.byteLength; i++) raw[i] = value.getUint8(i);
-      if (MOYU_VALID_TYPES.has(messageType(decode(raw, aes, iv)))) finish(true);
+      const decoded = decode(raw, aes, iv);
+      recordPacket('moyu', raw, decoded); // 探測期的回應也進擷取緩衝（金鑰逆向素材）
+      if (MOYU_VALID_TYPES.has(messageType(decoded))) finish(true);
     };
     const timer = setTimeout(() => finish(false), timeoutMs);
     chrctRead.addEventListener('characteristicvaluechanged', onValue);
