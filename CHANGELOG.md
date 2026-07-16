@@ -5,6 +5,24 @@
 
 ## [Unreleased]
 
+### Tornado V4 陀螺儀封包逆向 — QiYi driver 投遞 gyro 事件（決策層 2026-07-16）
+
+實機回報 Tornado V4 兩顆能串流但 3D 不跟著翻。查證官方規格確有高精度陀螺儀，但社群文件
+（Flying-Toast，對象是無陀螺儀的 QY-QYSC）與 csTimer 皆無此格式。由使用者平板擷取的
+XMD-TornadoV4LE-00F9「整顆翻轉」259 包**逆向破解**：
+
+- 根因：`parseCubeData` 首行 `if (msg[0] !== 0xfe) return` 把姿態封包（`0xcc` 框架）直接丟棄；
+  這些封包其實已通過 driver 既有的 AES-ECB 解密與 CRC-16/MODBUS 驗證。
+- 封包格式（鐵證）：`[0xcc, 0x10, seq, ts:2B-BE, ?:1B, quaternion:4×int16 BE @off6, crc:2B-LE]`。
+  259 包自由翻轉中 offset 6 起 4×int16 的 norm 變異僅 **0.03%**（單位四元數的鐵證），
+  且前 14 bytes 的 CRC-16/MODBUS **259/259** 全中。
+- 實作：`protocol.ts` 新增 `parseGyroQuaternion`（offset 6、BE、逐包正規化）、`FRAME_GYRO=0xcc`，
+  `parseCubeData` 加 0xcc 分支投遞 `gyro` 事件（無需 ACK，實機連續串流未斷線佐證）；
+  `ParsedQiyiEvent` 加 gyro 變體，QiyiDriver 既有事件迴圈自動透傳。
+- fixture 測試 3 例（`tests/qiyi-gyro.test.ts`）：真實加密封包走完整路徑 → 單位四元數；118 例綠燈。
+- **待最後一哩**：四元數分量順序（w 位置）與座標系對映無官方文件，暫用 GAN 座標轉換當初值 →
+  方塊會動但軸向可能不對，需一次「已知動作」實機校正（見 BACKLOG）。
+
 ### MoYu 金鑰自動探測 + 死連線修復（決策層 2026-07-13，實機「完全連不到」定位）
 
 實機關鍵回報：**QiYi/GAN 都能連，只有魔域（多顆）完全連不到**。這排除硬體/環境，

@@ -22,6 +22,11 @@ export const QIYI_KEY: readonly number[] = [
 
 const OPCODE_HELLO = 0x02;
 const OPCODE_STATE = 0x03;
+// Tornado V4 AI 系列的姿態（陀螺儀）封包框架：[0xcc, 0x10, seq, ts:2, ?, quaternion:4×int16 BE, crc:2]。
+// 非 csTimer/文件記載，由 XMD-TornadoV4LE-00F9 實機封包逆向（2026-07-16，決策層）：
+// 259 包自由翻轉中，offset 6 起 4×int16(BE) 的 norm 變異僅 0.03% → 確為單位四元數；
+// 前 14 bytes 的 CRC-16/MODBUS（存於 [14-15] LE）259/259 全中，與標準封包同校驗。
+const FRAME_GYRO = 0xcc;
 
 /** CRC-16/MODBUS（QiYi 封包完整性校驗）。 */
 export function crc16modbus(data: readonly number[]): number {
@@ -117,7 +122,27 @@ export function qiyiMoveToWca(code: number): string | null {
 export type ParsedQiyiEvent =
   | { type: 'move'; move: string; cubeTimestamp: number }
   | { type: 'facelets'; facelets: string }
-  | { type: 'battery'; level: number };
+  | { type: 'battery'; level: number }
+  | { type: 'gyro'; quaternion: [number, number, number, number] };
+
+/**
+ * 解析 Tornado V4 姿態封包（0xcc 框架）的四元數：offset 6 起 4 個 int16（big-endian），
+ * 逐包正規化為單位四元數。原始分量順序（哪個是 w / 座標系）待實機校正確認，先原序透傳。
+ */
+export function parseGyroQuaternion(msg: readonly number[]): [number, number, number, number] {
+  const s16 = (hi: number, lo: number): number => {
+    const v = ((hi << 8) | lo) & 0xffff;
+    return v >= 0x8000 ? v - 0x10000 : v;
+  };
+  const raw: [number, number, number, number] = [
+    s16(msg[6]!, msg[7]!),
+    s16(msg[8]!, msg[9]!),
+    s16(msg[10]!, msg[11]!),
+    s16(msg[12]!, msg[13]!),
+  ];
+  const n = Math.hypot(raw[0], raw[1], raw[2], raw[3]) || 1;
+  return [raw[0] / n, raw[1] / n, raw[2] / n, raw[3] / n];
+}
 
 export interface ParsedQiyiData {
   events: ParsedQiyiEvent[];
@@ -141,6 +166,11 @@ export function parseCubeData(
   prevBattery: number,
 ): ParsedQiyiData {
   const events: ParsedQiyiEvent[] = [];
+  // Tornado V4 姿態封包（0xcc 框架）：投遞 gyro，無需 ACK（實機 259 包連續串流未斷線佐證）。
+  if (msg[0] === FRAME_GYRO) {
+    events.push({ type: 'gyro', quaternion: parseGyroQuaternion(msg) });
+    return { events, ack: null, lastTs };
+  }
   if (msg[0] !== 0xfe) return { events, ack: null, lastTs };
 
   const opcode = msg[2]!;
