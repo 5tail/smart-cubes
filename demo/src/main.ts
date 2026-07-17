@@ -66,7 +66,7 @@ let gyroUserToggled = false; // 使用者是否手動碰過開關（碰過就不
 let gyroSeen = false; // 本次連線是否收過 gyro 事件（診斷用）
 function updateGyroHint(): void {
   if (gyroBtn.disabled) {
-    gyroHint.textContent = '此方塊無陀螺儀資料（目前僅 GAN 有原生 gyro；QiYi/MoYu 待逆向）';
+    gyroHint.textContent = '此方塊無陀螺儀資料（GAN/MoYu 原生支援；QiYi 僅 Tornado V4 系列）';
   } else if (!gyroSeen) {
     gyroHint.textContent = '轉一下方塊喚醒陀螺儀…（若一直停在這句，代表沒收到 gyro 事件）';
   } else if (gyroOn) {
@@ -354,7 +354,9 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
     lastCubeName = cube.deviceName;
     deviceNameEl.textContent = `已連線：${cube.deviceName}（${cube.brand}）${macInfo}`;
     setConnected(true, '已連線');
-    setGyroAvailable(cube.brand === 'gan'); // 只有 GAN 會投遞 gyro 事件
+    // GAN 原生串流；MoYu 由 driver 送開啟指令（0xAC）後串流；QiYi 僅 Tornado V4 系列有
+    // 姿態封包 → 靠事件驅動啟用（首個 gyro 事件到達時自動開放開關）。
+    setGyroAvailable(cube.brand === 'gan' || cube.brand === 'moyu');
     await cube.requestBattery();
     await cube.requestState();
   } catch (err) {

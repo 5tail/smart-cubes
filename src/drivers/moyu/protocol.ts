@@ -26,6 +26,13 @@ export const OPCODE_INFO = 161;
 export const OPCODE_STATE = 163;
 export const OPCODE_BATTERY = 164;
 export const OPCODE_MOVE = 165;
+// 陀螺儀（csTimer 只留註解掉的 `msgType == 171 // gyro`，無實作）。格式由三個獨立社群來源
+// 交叉驗證一致：lukeburong/weilong-v10-ai-protocol（bit 級文件）、BTimeApp/BTime、
+// huizhiLLL/DCTimer-BLE（GYRO_SCALE=2^30）、PaulSun10/CubeFlow（分量順序）。
+export const OPCODE_GYRO = 171;
+// 陀螺儀開關指令（0xAC）：byte[2]=1 開啟、0 關閉。方塊預設不串流 gyro，須主動開啟
+// —— 這解釋了 csTimer 為何收得到 msgType 171 卻註解掉（官方 app 開過、狀態殘留才會收到）。
+export const OPCODE_GYRO_CTRL = 172;
 
 /** 由 MAC 推導 AES 金鑰與 IV（前 6 bytes 各加上反序的 MAC byte，模 255）。 */
 export function deriveKeyIv(mac: string): { key: number[]; iv: number[] } {
@@ -113,6 +120,33 @@ export function parseFacelet(faceletBits: string): string {
 export function parseState(decoded: readonly number[]): { facelets: string; moveCnt: number } {
   const s = bytesToBitString(decoded);
   return { facelets: parseFacelet(s.slice(8, 152)), moveCnt: bits(s, 152, 160 - 152) };
+}
+
+/** 建立陀螺儀開關請求（opcode 172）：req[2]=1 開啟、0 關閉（未加密，由 driver 以 encode 包裝）。 */
+export function buildGyroControl(enable: boolean): number[] {
+  const req = new Array<number>(20).fill(0);
+  req[0] = OPCODE_GYRO_CTRL;
+  req[2] = enable ? 1 : 0;
+  return req;
+}
+
+/**
+ * 解析陀螺儀封包（opcode 171）：byte 1 起 4 個 int32（little-endian，注意與其他欄位的
+ * MSB-first bit 解析不同），依序為 w, x, y, z，各除以 2^30 後為單位四元數（逐包正規化防漂移）。
+ *
+ * 回傳 [x, y, z, w]，與 GAN driver 的 gyro 事件同序。座標系：MoYu 為 x=右、y=後、z=上
+ * （BTimeApp/BTime 逆向記載），與 GAN 相同 → 原樣透傳，demo 既有的 GAN 基變換直接適用。
+ * 軸向/手性以文件為據、尚未實機校正；若實機鏡像再調（見 BACKLOG）。
+ */
+export function parseGyroQuaternion(decoded: readonly number[]): [number, number, number, number] {
+  const i32le = (off: number): number =>
+    (decoded[off]! | (decoded[off + 1]! << 8) | (decoded[off + 2]! << 16) | (decoded[off + 3]! << 24)) | 0;
+  const w = i32le(1);
+  const x = i32le(5);
+  const y = i32le(9);
+  const z = i32le(13);
+  const n = Math.hypot(w, x, y, z) || 1;
+  return [x / n, y / n, z / n, w / n];
 }
 
 /** 解析電量封包（opcode 164）：0–100。 */
