@@ -67,9 +67,30 @@
           <h2>輸入方塊 MAC address</h2>
           <p class="mac-device" id="mac-device-name"></p>
           <p class="mac-help">
-            GAN 方塊需要藍牙 MAC 才能推導金鑰。若瀏覽器沒開自動偵測，請手動輸入一次
-            （之後會記住這顆方塊，不再詢問）。
+            GAN 方塊需要藍牙 MAC 才能推導金鑰。兩條路擇一：<strong>開啟瀏覽器自動偵測</strong>
+            （推薦，設定一次、之後免輸入），或往下<strong>手動輸入一次</strong>
+            （會記住這顆方塊，不再詢問）。
           </p>
+          <details class="mac-flag-guide" id="mac-flag-guide">
+            <summary>⚡ 免輸入模式：讓 Chrome 自動抓 MAC（設定一次就好）</summary>
+            <p class="mac-flag-status" id="mac-flag-status"></p>
+            <ol>
+              <li>
+                複製這個網址（<code>chrome://</code> 網址不能用點的，要貼到網址列）：
+                <span class="mac-flag-url">
+                  <code id="mac-flag-url">chrome://flags/#enable-experimental-web-platform-features</code>
+                  <button type="button" id="mac-flag-copy">📋 複製</button>
+                </span>
+              </li>
+              <li>貼到 Chrome 網址列開啟，把「Experimental Web Platform features」設為 <strong>Enabled</strong></li>
+              <li>按 <strong>Relaunch</strong> 重啟瀏覽器</li>
+              <li>回到本頁重新連線 —— 之後連 GAN 都不用輸入 MAC</li>
+            </ol>
+            <p class="mac-flag-note">
+              電腦與 Android 平板的 Chrome 都適用。此旗標只是開啟「網頁讀取藍牙廣播」的
+              實驗功能（方塊 MAC 藏在廣播裡），不影響其他網站。
+            </p>
+          </details>
           <input
             id="mac-input"
             class="mac-input"

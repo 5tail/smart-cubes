@@ -13,7 +13,10 @@
 - [x] MAC 記憶（localStorage，SPEC §7 第二層）+ 友善引導對話框（demo）；driver MAC fallback 順序對齊 `gan-web-bluetooth`。GAN 首次一次性輸入後即記住。
 - [x] **決策層（收檔 2026-07-17）**：MAC 記憶**維持 demo 層**。套件保持純粹、儲存交給 app
       （macProvider）是刻意設計；未來多個下游都要記憶時再重開。
-- [x] GAN 自動抓 MAC 需 `chrome://flags/#enable-experimental-web-platform-features`（`watchAdvertisements`）— 已於 README/demo 說明三層 fallback（開旗標自動抓 / 手動輸入一次 / 記憶）。真正零設定需桌面 App（Electron/Tauri，SPEC Phase 4 週賽專案再議）。
+- [x] GAN 自動抓 MAC 需 `chrome://flags/#enable-experimental-web-platform-features`（`watchAdvertisements`）— 已於 README/demo 說明三層 fallback（開旗標自動抓 / 手動輸入一次 / 記憶）。
+      **2026-07-17 補**：MAC 對話框內建「⚡ 免輸入模式」引導（一鍵複製旗標網址 + 四步驟 +
+      旗標狀態偵測），一般使用者不看 README 也能自助設定。真正零設定需桌面 App
+      （Electron/Tauri，SPEC Phase 4 週賽專案再議）。
 - [x] Phase 3（文件）：README（中英雙語）、CONTRIBUTING、demo 加支援清單與已知限制。
 - [x] Phase 3（發佈準備，2026-07-17）：前置條件（QY-QYSC 實機驗證）已滿足。版本 0.1.0、
       NOTICE.md 隨套件散佈、prepublishOnly 把關、TESTING.md 皆已就緒；
