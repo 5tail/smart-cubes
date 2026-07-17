@@ -70,7 +70,7 @@ function updateGyroHint(): void {
   } else if (!gyroSeen) {
     gyroHint.textContent = '轉一下方塊喚醒陀螺儀…（若一直停在這句，代表沒收到 gyro 事件）';
   } else if (gyroOn) {
-    gyroHint.textContent = '✓ 陀螺儀運作中：翻轉方塊看 3D 跟著轉，可按「校正正面」歸正';
+    gyroHint.textContent = '✓ 陀螺儀運作中：翻轉方塊看 3D 跟著轉；拖曳畫面可環視、按「校正正面」歸正';
   } else {
     gyroHint.textContent = '✓ 偵測到陀螺儀，點「🧭 陀螺儀姿態」啟用';
   }

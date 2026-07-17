@@ -261,3 +261,24 @@ export function ganQuatToCssTransform(current: Quat, baseline: Quat = QUAT_IDENT
   const relGan = quatMultiply(current, quatConjugate(baseline));
   return cubeQuatToCssMatrix(ganQuatToCubeQuat(relGan));
 }
+
+/**
+ * 視角 transform：orbit（拖曳/觸控環視）與 gyro 姿態的組合。
+ *
+ * - gyro 關閉：純 orbit（`rotateX(pitch) rotateY(yaw)`），與舊行為相同。
+ * - gyro 開啟：orbit 疊在 gyro 姿態**外層**（CSS 左式先套 → 螢幕軸環視），實體方塊控制
+ *   姿態、拖曳環視鏡頭，兩者獨立不打架（可拖去看背面）。pitch/yaw 皆為 0 時輸出與
+ *   `ganQuatToCssTransform` 全等（校正回正不變式不受影響）。
+ */
+export function viewTransform(
+  gyroMode: boolean,
+  pitch: number,
+  yaw: number,
+  current: Quat,
+  baseline: Quat = QUAT_IDENTITY,
+): string {
+  const orbit = `rotateX(${pitch}deg) rotateY(${yaw}deg)`;
+  if (!gyroMode) return orbit;
+  const gyro = ganQuatToCssTransform(current, baseline);
+  return pitch === 0 && yaw === 0 ? gyro : `${orbit} ${gyro}`;
+}
