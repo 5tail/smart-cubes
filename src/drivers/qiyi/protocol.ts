@@ -22,6 +22,12 @@ export const QIYI_KEY: readonly number[] = [
 
 const OPCODE_HELLO = 0x02;
 const OPCODE_STATE = 0x03;
+// 狀態覆寫（app→方塊）與其確認回應（方塊→app）。csTimer 未實作；由 Flying-Toast
+// qiyi_smartcube_protocol 文件記載，並經三個獨立實作交叉驗證（huizhiLLL/DCTimer-BLE、
+// maggnus/CubeZX3 抓包文件、KittatamSaisaard/qiyi_smartcube_protocol_web）。
+const OPCODE_SYNC = 0x04;
+// 0x04 內容的固定前綴（opcode 後 4 bytes；各實作皆硬編碼此值，方塊不驗證）。
+const SYNC_PREFIX: readonly number[] = [0x17, 0x88, 0x8b, 0x31];
 // Tornado V4 AI 系列的姿態（陀螺儀）封包框架：[0xcc, 0x10, seq, ts:2, ?, quaternion:4×int16 BE, crc:2]。
 // 非 csTimer/文件記載，由 XMD-TornadoV4LE-00F9 實機封包逆向（2026-07-16，決策層）：
 // 259 包自由翻轉中，offset 6 起 4×int16(BE) 的 norm 變異僅 0.03% → 確為單位四元數；
@@ -108,6 +114,27 @@ export function parseFacelet(faceMsg: readonly number[]): string {
     ret.push('LRDUFB'.charAt(((faceMsg[i >> 1]! >> ((i % 2) << 2)) & 0xf) as number));
   }
   return ret.join('');
+}
+
+/** 54 字元 facelet（Kociemba URFDLB）→ 27 bytes（54 個 nibble）；parseFacelet 的逆。 */
+export function encodeFacelet(facelets: string): number[] {
+  const out = new Array<number>(27).fill(0);
+  for (let i = 0; i < 54; i++) {
+    const nibble = 'LRDUFB'.indexOf(facelets.charAt(i));
+    out[i >> 1] = out[i >> 1]! | ((nibble & 0xf) << ((i % 2) << 2));
+  }
+  return out;
+}
+
+/**
+ * 建立狀態覆寫封包（opcode 0x04）：把方塊內部狀態覆寫為指定 facelets
+ * （resetToSolved 用復原態）。方塊會回 0x04 確認包（帶新 facelets，見 parseCubeData）。
+ * 內容 = [0x04, 前綴 4B, facelet 27B, 0x00, 0x00]；framing 後 len=0x26，
+ * 與 CubeZX3 實機抓包記載的官方 app「FE 26 04 …」重置封包一致。
+ */
+export function buildSyncState(facelets: string, key: readonly number[] = QIYI_KEY): number[] {
+  const content = [OPCODE_SYNC, ...SYNC_PREFIX, ...encodeFacelet(facelets), 0x00, 0x00];
+  return buildMessage(content, key);
 }
 
 /** QiYi 轉動碼（1–12）→ WCA 表記；未知碼回傳 null。 */
@@ -204,6 +231,13 @@ export function parseCubeData(
     const battery = msg[35]!;
     if (battery !== prevBattery) events.push({ type: 'battery', level: battery });
     return { events, ack, lastTs: ts };
+  }
+
+  if (opcode === OPCODE_SYNC) {
+    // 狀態覆寫確認：回帶覆寫後的 facelets。不需 ACK（DCTimer-BLE 同）；
+    // 方塊內部計數重新起算，lastTs 取本包 ts（避免舊歷史 move 被誤補投）。
+    events.push({ type: 'facelets', facelets: parseFacelet(msg.slice(7, 34)) });
+    return { events, ack: null, lastTs: ts };
   }
 
   return { events, ack: null, lastTs };
