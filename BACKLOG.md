@@ -11,13 +11,18 @@
       交由 gan-web-bluetooth 連線（見 SPEC §5 ADR）。若上游未來開放傳入 device，移除該 shim。
 - [x] Phase 2：QiYi + MoYu driver — 由 csTimer 移植（`qiyicube.js` / `moyu32cube.js`），fixture 測試覆蓋解密/解析；QiYi ACK 邏輯進 driver。共用 `utils/crypto.ts`(AES-128) 與 `utils/facelets.ts`(CubieCube)。（實機驗收待五尾）
 - [x] MAC 記憶（localStorage，SPEC §7 第二層）+ 友善引導對話框（demo）；driver MAC fallback 順序對齊 `gan-web-bluetooth`。GAN 首次一次性輸入後即記住。
-- [ ] **決策層**：MAC 記憶要不要進「套件層」（目前只在 demo）。套件保持純粹、把儲存交給 app（macProvider）是刻意選擇；若未來多個下游都要記憶，再評估是否提供內建 localStorage 版。
+- [x] **決策層（收檔 2026-07-17）**：MAC 記憶**維持 demo 層**。套件保持純粹、儲存交給 app
+      （macProvider）是刻意設計；未來多個下游都要記憶時再重開。
 - [x] GAN 自動抓 MAC 需 `chrome://flags/#enable-experimental-web-platform-features`（`watchAdvertisements`）— 已於 README/demo 說明三層 fallback（開旗標自動抓 / 手動輸入一次 / 記憶）。真正零設定需桌面 App（Electron/Tauri，SPEC Phase 4 週賽專案再議）。
 - [x] Phase 3（文件）：README（中英雙語）、CONTRIBUTING、demo 加支援清單與已知限制。
-- [ ] Phase 3（發佈）：npm publish 0.1.0 — **待 QiYi 標準版（QY-QYSC）實機驗過再發**。
+- [x] Phase 3（發佈準備，2026-07-17）：前置條件（QY-QYSC 實機驗證）已滿足。版本 0.1.0、
+      NOTICE.md 隨套件散佈、prepublishOnly 把關、TESTING.md 皆已就緒；
+      **實際 `npm publish` 待套件擁有者執行**（見 PR 發佈 checklist）。發完後把 README
+      兩處「尚未上 npm」字樣移除。
 - [x] `src/core/timesync.ts`（線性回歸時間戳校正，`createTimestampFitter`）。
 - [x] `src/core/connect.ts`（統一入口；品牌偵測待 Phase 2 多品牌整合）。
-- [ ] `src/core/SmartCube.ts`（抽象基底）— 目前 GanDriver 直接實作 `SmartCube` 介面，抽象基底待有第二個 driver 時再視需要抽出。
+- [x] **決策層（收檔 2026-07-17）**：`src/core/SmartCube.ts` 抽象基底**不做**（YAGNI）——
+      三個 driver 直接實作介面至今無重複痛點；若未來新增品牌出現明顯樣板重複再重開。
 - [x] `src/utils/`：`crypto.ts`（最小 AES-128）、`facelets.ts`（CubieCube 狀態/轉動代數）。
 - [x] `tests/fixtures/moyu-real.json`：MoYu WeiLong AI 實機封包（R U F' R' U'），實機驗收通過（解密/解析/重建三層對上方塊自報狀態）。
 - [x] QiYi 實機連線：**QY-QYSC-A / XMD-TornadoV4-i / Tornado V4 LE 三顆實機皆連線並串流成功**。
@@ -58,7 +63,7 @@
       不再能靠方塊自報自動復原。實務上移動封包帶多步歷史可自癒短暫掉包；若實機回報漂移，
       決策層再評估顯式 `recoverState()`（重新以自報狀態為基準）。
 - [ ] demo「🔍 診斷方塊（除錯）」工具：抓廣播（含 MAC）+ 列舉 GATT 服務/特徵值/屬性/可讀值，供未來新型號分析（已就緒）。
-- [ ] **MoYu 廣播 MAC 之謎（決策層複查 2026-07-13 留檔）**：統一入口下廣播解析值曾致金鑰錯
+- [x] **MoYu 廣播 MAC 之謎（收檔 2026-07-17：連線已穩，降級為留檔不追）**：統一入口下廣播解析值曾致金鑰錯
       （已以「名稱推導優先」修復）。但 csTimer 本身是廣播優先且能動 —— 疑似我們解析到
       非 MAC 的 manufacturer data 封包（第一包就收，QiYi 有「含 MAC 的掃描回應較晚到」前科）。
       **一錘定音法**：demo「🔍 診斷方塊」對 WCU_MY32_B6EF 抓 6 秒合併廣播，看各 cic 的
@@ -70,7 +75,8 @@
       不會走到 macProvider 手動）。目前支援清單內無此機型證據，暫不做投機性重試；
       實機回報時再議（可仿 csTimer isWrongKey：解密後 messageType 全非法 → 換下一個 MAC 來源重試）。
 - [ ] MoYu 電量/資訊封包實機 fixture（本次擷取未含 0xA1/0xA4）。
-- [ ] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）。
+- [x] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）——
+      2026-07-17 完成，沉澱三品牌實機驗收流程 + 品牌特例 + 除錯工具 + 發佈前檢查。
 
 ## 範圍外 / 未來（不在 MVP）
 

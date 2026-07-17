@@ -5,6 +5,24 @@
 
 ## [Unreleased]
 
+### 0.1.0 發佈準備（決策層 2026-07-17）
+
+MVP 功能全數實機驗收通過（三品牌連線/串流/電量/重置/陀螺儀 + 觸控環視），
+npm 發佈前置條件（QY-QYSC 實機驗證）已滿足，執行 Phase 3 發佈收尾：
+
+- `package.json`：版本 0.0.0 → **0.1.0**；`files` 加入 `NOTICE.md`（GPL 移植清單必須隨
+  套件散佈）；新增 `prepublishOnly`（typecheck + test + build，發佈前自動把關）。
+  套件名 `maru-smartcube` 已確認 npm 可用（registry 404）。
+- `NOTICE.md`：移除過時的「Phase 0 尚未移植」段落；補齊陀螺儀與 QiYi 0x04 的參考來源
+  （lukeburong/weilong-v10-ai-protocol、BTime、DCTimer-BLE、CubeZX3）。
+- `TESTING.md` 新增（SPEC §7 對策）：藍牙 I/O 手動測試 checklist —— 每品牌基本流程
+  （連線/串流/電量/重置/陀螺儀/觸控環視/重連）、品牌特例、除錯工具、發佈前檢查。
+- BACKLOG 收檔三個決策項：MAC 記憶維持 demo 層（macProvider 設計本意）、
+  `SmartCube.ts` 抽象基底不做（YAGNI）、MoYu 廣播 MAC 之謎降級為留檔。
+- 實際 `npm publish` 由套件擁有者執行（需 npm 帳號），步驟見 PR 的發佈 checklist。
+
+## [0.1.0] - 2026-07-17
+
 ### QiYi 六面重置修復 — resetToSolved 改送 0x04 狀態覆寫指令（決策層 2026-07-17）
 
 實機回報：奇藝系（QY-QYSC / Tornado V4）按「六面重置」無效，GAN/MoYu 都正常。

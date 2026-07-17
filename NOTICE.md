@@ -12,9 +12,6 @@ Copyright (C) 2026 五尾（小丸號）
 
 ## 移植來源（Ported / Adapted Sources）
 
-> Phase 0 尚未移植任何協議程式碼；下列為已規劃、後續 Phase 將移植/依賴的來源。
-> 每完成一段移植，於此表補上原始檔案路徑與對應的本專案檔案。
-
 ### csTimer — MoYu / QiYi 協議
 
 - **原作者**：Chen Shuang（陳霜）
@@ -42,14 +39,22 @@ Copyright (C) 2026 五尾（小丸號）
 - **授權**：MIT（GPL 相容）
 - **使用方式**：作為 npm 依賴，包裝其 RxJS Observable 事件轉為本套件的 `CubeEvent`
   （非移植，直接依賴）。
-- **對應本專案檔案**：`src/drivers/gan/`（Phase 1 補上）
+- **對應本專案檔案**：`src/drivers/gan/`
 
 ### 參考文件（未移植程式碼，僅比對協議理解）
 
-- **qiyi_smartcube_protocol** — Flying-Toast，QiYi 協議文件
-  https://github.com/Flying-Toast/qiyi_smartcube_protocol
+- **qiyi_smartcube_protocol** — Flying-Toast，QiYi 協議文件（QiYi 0x04 狀態覆寫指令的
+  文件來源）https://github.com/Flying-Toast/qiyi_smartcube_protocol（已遷移至 Codeberg）
 - **qy-cube** — agolovchuk，QiYi 參考實作
   https://github.com/agolovchuk/qy-cube
+- **weilong-v10-ai-protocol** — lukeburong，MoYu WCU_MY32 協議 bit 級文件
+  （陀螺儀 0xAB 封包與 0xAC 開關指令的文件來源）
+  https://github.com/lukeburong/weilong-v10-ai-protocol
+- **BTime**（BTimeApp）與 **DCTimer-BLE**（huizhiLLL）— MoYu 陀螺儀格式與 QiYi 0x04
+  的交叉驗證實作 https://github.com/BTimeApp/BTime ·
+  https://github.com/huizhiLLL/DCTimer-BLE
+- **CubeZX3** — maggnus，Tornado V4 官方 app 實機抓包文件（QiYi 0x04 重置封包
+  「FE 26 04」與復原態 27-byte 編碼的行為錨）https://github.com/maggnus/CubeZX3
 
 ---
 
