@@ -15,7 +15,7 @@ import {
   cubieToFacelet,
   moveToRotation,
   inMoveLayer,
-  ganQuatToCssTransform,
+  viewTransform,
   QUAT_IDENTITY,
   type Vec3,
   type Quat,
@@ -48,9 +48,12 @@ export interface Cube3d {
   applyMove(move: string): void;
   /** gyro 事件：更新方塊姿態（僅 gyro 模式時會反映到畫面）。 */
   setOrientation(quaternion: Quat): void;
-  /** 切換 gyro 姿態模式：on 時方塊朝向由 setOrientation 驅動、拖曳環視停用（並把當前姿態設為基準）。 */
+  /**
+   * 切換 gyro 姿態模式：on 時方塊朝向由 setOrientation 驅動（當前姿態設為基準、環視角歸零）。
+   * 拖曳/觸控環視兩種模式皆可用：gyro 模式下環視角疊在姿態外層（螢幕軸），可拖去看背面。
+   */
   setGyroMode(on: boolean): void;
-  /** 把當前姿態設為「正面」基準（gyro 模式下按下即回正）。 */
+  /** 把當前姿態設為「正面」基準並歸零環視角（gyro 模式下按下即回正）。 */
   calibrate(): void;
 }
 
@@ -68,7 +71,7 @@ function applyMoveAlgebraic(facelets: string, move: string): string | null {
 export function createCube3d(root: HTMLElement): Cube3d {
   root.classList.add('cube3d-scene');
   root.style.setProperty('--cubie', `${CUBIE}px`);
-  root.title = '拖曳旋轉視角';
+  root.title = '拖曳／觸控旋轉視角';
   const cubeEl = document.createElement('div');
   cubeEl.className = 'cube3d';
   root.appendChild(cubeEl);
@@ -116,23 +119,26 @@ export function createCube3d(root: HTMLElement): Cube3d {
   }
   paint(displayed);
 
-  // --- 方塊朝向：orbit（手動拖曳環視）或 gyro（陀螺儀姿態）二選一 ---
+  // --- 方塊朝向：orbit（拖曳/觸控環視）+ gyro（陀螺儀姿態）可疊加 ---
+  // gyro 關閉：純 orbit（pitch/yaw）。gyro 開啟：實體方塊控制姿態、拖曳環視鏡頭
+  // （gyroPitch/gyroYaw 疊在姿態外層），兩組環視角獨立、切換模式互不污染。
   let pitch = -24;
   let yaw = -38;
+  let gyroPitch = 0; // gyro 模式下的環視角（進入模式/校正時歸零 = 正面直視）
+  let gyroYaw = 0;
   let gyroMode = false;
   let currentQuat: Quat = QUAT_IDENTITY; // 最新 gyro 姿態（GAN 座標系）
   let baselineQuat: Quat = QUAT_IDENTITY; // 校正基準（按「校正正面」時 = 當前姿態）
   function applyView(): void {
     cubeEl.style.transform = gyroMode
-      ? ganQuatToCssTransform(currentQuat, baselineQuat)
-      : `rotateX(${pitch}deg) rotateY(${yaw}deg)`;
+      ? viewTransform(true, gyroPitch, gyroYaw, currentQuat, baselineQuat)
+      : viewTransform(false, pitch, yaw, QUAT_IDENTITY);
   }
   applyView();
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
   root.addEventListener('pointerdown', (e) => {
-    if (gyroMode) return; // gyro 模式下方塊朝向由陀螺儀決定，停用拖曳
     dragging = true;
     lastX = e.clientX;
     lastY = e.clientY;
@@ -140,8 +146,15 @@ export function createCube3d(root: HTMLElement): Cube3d {
   });
   root.addEventListener('pointermove', (e) => {
     if (!dragging) return;
-    yaw += (e.clientX - lastX) * 0.5;
-    pitch = Math.max(-90, Math.min(90, pitch - (e.clientY - lastY) * 0.5));
+    const dYaw = (e.clientX - lastX) * 0.5;
+    const dPitch = (e.clientY - lastY) * 0.5;
+    if (gyroMode) {
+      gyroYaw += dYaw;
+      gyroPitch = Math.max(-90, Math.min(90, gyroPitch - dPitch));
+    } else {
+      yaw += dYaw;
+      pitch = Math.max(-90, Math.min(90, pitch - dPitch));
+    }
     lastX = e.clientX;
     lastY = e.clientY;
     applyView();
@@ -227,11 +240,17 @@ export function createCube3d(root: HTMLElement): Cube3d {
     },
     setGyroMode(on: boolean): void {
       gyroMode = on;
-      if (on) baselineQuat = currentQuat; // 開啟即以當前姿態為正面基準
+      if (on) {
+        baselineQuat = currentQuat; // 開啟即以當前姿態為正面基準
+        gyroPitch = 0; // 環視角歸零：正面直視（拖曳後可再環視）
+        gyroYaw = 0;
+      }
       applyView();
     },
     calibrate(): void {
       baselineQuat = currentQuat;
+      gyroPitch = 0; // 「回正」= 姿態基準 + 環視角一起歸正
+      gyroYaw = 0;
       if (gyroMode) applyView();
     },
   };
