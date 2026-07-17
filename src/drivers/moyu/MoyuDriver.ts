@@ -11,14 +11,17 @@ import {
   OPCODE_STATE,
   OPCODE_BATTERY,
   OPCODE_MOVE,
+  OPCODE_GYRO,
   deriveKeyIv,
   decode,
   encode,
   buildRequest,
+  buildGyroControl,
   messageType,
   parseState,
   parseBattery,
   parseMovePacket,
+  parseGyroQuaternion,
   defaultMacFromName,
 } from './protocol.js';
 import { recordPacket } from '../../utils/debug.js';
@@ -115,6 +118,10 @@ export class MoyuDriver extends EventTarget implements SmartCube {
         break;
       case OPCODE_MOVE:
         this.handleMovePacket(decoded);
+        break;
+      case OPCODE_GYRO:
+        // 高頻姿態封包（連線時 driver 已送 0xAC 開啟指令）；只透傳，消費在 demo（同 GAN/QiYi）。
+        this.emit({ type: 'gyro', quaternion: parseGyroQuaternion(decoded) });
         break;
       case OPCODE_INFO:
       default:
@@ -238,7 +245,7 @@ export async function connectMoyuCube(options: ConnectOptions = {}): Promise<Moy
   return connectMoyuDevice(device, options);
 }
 
-const MOYU_VALID_TYPES = new Set([OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY, OPCODE_MOVE]);
+const MOYU_VALID_TYPES = new Set([OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY, OPCODE_MOVE, OPCODE_GYRO]);
 
 /**
  * 對 MoYu 寫入指令。`writeValue` 的寫入模式（with/without response）各平台實作不一
@@ -362,5 +369,8 @@ export async function connectMoyuDevice(
   for (const opcode of [OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY]) {
     await writeCommand(chrctWrite, encode(buildRequest(opcode), aes, iv));
   }
+  // 開啟陀螺儀串流（opcode 172）：方塊預設不送 gyro，須主動開啟。放在三個請求之後，
+  // 即使個別韌體不認得此指令，state/battery 已請求完畢、基本功能不受影響。
+  await writeCommand(chrctWrite, encode(buildGyroControl(true), aes, iv));
   return driver;
 }

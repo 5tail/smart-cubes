@@ -5,6 +5,30 @@
 
 ## [Unreleased]
 
+### MoYu 陀螺儀連動 — 投遞 gyro 事件 + 連線時自動開啟（決策層 2026-07-17）
+
+前情：使用者實機回報（2026-07-17）**魔域已能連線且抓得到封包**——先前「平板 0 封包」問題
+在 writeWithoutResponse + INFO→STATE 握手順序修正（commit 67db315）部署後解除。
+本輪補上魔域陀螺儀，讓 3D 方塊跟著實體翻轉（GAN、QiYi Tornado V4 已具備）。
+
+- **封包格式免逆向**：csTimer 只有註解掉的 `msgType == 171 // gyro`，但社群已有文件與實作，
+  三個獨立來源交叉一致 —— lukeburong/weilong-v10-ai-protocol（bit 級文件）、BTimeApp/BTime
+  （TS 實作）、huizhiLLL/DCTimer-BLE（`GYRO_SCALE = 2^30`）：
+  `[0xAB][w,x,y,z 各 int32 little-endian ÷ 2^30]`（走既有 AES 解密路徑，注意 LE 與其他欄位
+  的 MSB-first 不同）。
+- **關鍵機關：0xAC 開啟指令**。方塊預設不串流 gyro，須寫入 `[0xAC, 0x00, 0x01, …]` 開啟
+  —— 這解釋了 csTimer 為何收得到 msgType 171 卻無實作（官方 app 開過、狀態殘留才收得到）。
+  `connectMoyuDevice` 在 INFO/STATE/BATTERY 請求之後自動送出；個別韌體不認得此指令也不影響
+  基本功能（state/battery 已請求完畢）。
+- **座標系零改動**：MoYu 座標系（x=右、y=後、z=上）與 GAN 相同（BTime 逆向記載），
+  `parseGyroQuaternion` 依 GAN 同序回傳 `[x,y,z,w]` 原樣透傳，demo 既有 GAN 基變換直接適用。
+  軸向/手性以文件為據、待實機驗證（見 BACKLOG）。
+- 探測合法型別加入 171（gyro 已開啟的方塊在探測期串流姿態封包也算金鑰正確）。
+- demo：陀螺儀開關對 MoYu 一併啟用；提示文案更新（原「QiYi/MoYu 待逆向」已過時）。
+- fixture 測試 5 例（`tests/moyu-gyro.test.ts`）：固定金鑰加密的完整 20-byte gyro 封包走
+  真實解密路徑 → 四元數（含負分量/LE 符號位/正規化）、0xAC 指令位元組、driver 投遞 gyro
+  事件、connect init 尾端送開啟指令；123 例綠燈。
+
 ### Tornado V4 陀螺儀封包逆向 — QiYi driver 投遞 gyro 事件（決策層 2026-07-16）
 
 實機回報 Tornado V4 兩顆能串流但 3D 不跟著翻。查證官方規格確有高精度陀螺儀，但社群文件
