@@ -32,7 +32,7 @@
       這是 QY 那顆卡住的主因），重連經 `macProvider` 取回真 MAC；記住的 MAC 無法串流時 5 秒自動清除並提示重整。
 - [x] **決策層｜介面**：`resetToSolved(): Promise<void>` 已於 2026-07-13 正式納入 `SmartCube`
       凍結合約（SPEC §3.3 + §5 ADR），三家 driver 具體實作升格，demo 直接呼叫。
-      QiYi 維持重送 hello（協議無 BLE 重置指令，方塊自身會追蹤實體復原）。
+      （QiYi 原「重送 hello」做法已於 2026-07-17 升級為 0x04 狀態覆寫，見下方。）
 - [x] **3D 立體方塊（demo）**：純 CSS 3D transforms（SPEC §5 ADR 2026-07-13），facelets 權威 +
       move 動畫，與 2D 切換並存；幾何映射有 CubieCube 交叉驗證測試。
 - [x] **陀螺儀 3D 姿態（demo，GAN）**：GAN gyro quaternion 驅動 3D 方塊即時翻轉（SPEC §5 ADR
@@ -42,10 +42,9 @@
       實機 259 包翻轉封包破解 —— `0xcc` 框架 `[cc 10 seq ts:2 ?:1 quat(4×int16 BE) crc:2]`，
       offset 6 起四元數 norm 變異僅 0.03%、CRC16/MODBUS 259/259 全中。已在 `protocol.ts`
       實作 `parseGyroQuaternion` + `parseCubeData` 0xcc 分支投遞 gyro 事件，fixture 測試 3 例。
-- [ ] **Tornado V4 陀螺儀座標校正（剩最後一哩）**：封包格式已鎖定、gyro 事件已流出、demo 已
-      渲染，但**四元數分量順序（哪個是 w）與座標系對映未知**（無官方文件）。目前暫用 GAN 的
-      座標轉換當初值 → 方塊會跟著動但軸向可能不對。需一次「已知動作」實機校正：請使用者做
-      指定翻轉（如白上綠前 → 整顆順時針轉 90°）並回報畫面轉向，即可一次解出分量順序 + 軸號。
+- [x] **Tornado V4 陀螺儀座標實機回報跟隨正常（2026-07-17）**：使用者回報 XMD（Tornado V4）
+      3D 跟著實體轉動，暫用的 GAN 座標轉換即正確（或誤差不可感）。若日後發現特定軸鏡像/
+      對調，再做一次「已知動作」校正（白上綠前 → 俯視順時針 90°，回報畫面轉向）。
 - [x] **MoYu 陀螺儀已實作（2026-07-17，決策層）**：格式由三個獨立社群來源交叉驗證
       （lukeburong/weilong-v10-ai-protocol、BTimeApp/BTime、DCTimer-BLE），無需自行錄封包逆向：
       `[0xAB][w,x,y,z 各 int32 LE ÷2^30]`，且須先送 0xAC 開啟指令（byte[2]=1）——
@@ -53,9 +52,8 @@
       driver 連線 init 尾端自動開啟；座標系（x=右,y=後,z=上）與 GAN 相同故原樣透傳。
 - [x] **MoYu 陀螺儀實機驗收通過（2026-07-17，使用者 Android 平板回報）**：3D 跟著魔域
       方塊轉向，文件記載的座標系（與 GAN 相同）原樣透傳即正確，無需軸向校正。
-- [ ] **QiYi 0x04 狀態覆寫實機驗收**：resetToSolved 已改送覆寫指令（文件+三實作交叉驗證，
-      fixture 測試綠燈），待實機在 QY-QYSC 與 Tornado V4 各按一次「六面重置」確認畫面變
-      六面且後續轉動正常。若 Tornado 韌體拒收（文件主要對象是 QY-QYSC），錄封包回報。
+- [x] **QiYi 0x04 狀態覆寫實機驗收通過（2026-07-17，使用者回報）**：奇藝系「六面重置」
+      實機可用，resetToSolved 覆寫指令生效，三品牌重置語意對齊。
 - [ ] MoYu 掉包超過移動封包歷史長度時，重建可能漂移；因「基準後以重建為權威」（ADR 2026-07-13），
       不再能靠方塊自報自動復原。實務上移動封包帶多步歷史可自癒短暫掉包；若實機回報漂移，
       決策層再評估顯式 `recoverState()`（重新以自報狀態為基準）。
