@@ -67,7 +67,8 @@
           <h2>輸入方塊 MAC address</h2>
           <p class="mac-device" id="mac-device-name"></p>
           <p class="mac-help">
-            GAN 方塊需要藍牙 MAC 才能推導金鑰。兩條路擇一：<strong>開啟瀏覽器自動偵測</strong>
+            這顆方塊需要藍牙 MAC 才能完成連線（GAN 用於推導金鑰；QiYi 的 hello 必須帶對
+            MAC 方塊才回話）。兩條路擇一：<strong>開啟瀏覽器自動偵測</strong>
             （推薦，設定一次、之後免輸入），或往下<strong>手動輸入一次</strong>
             （會記住這顆方塊，不再詢問）。
           </p>
@@ -154,9 +155,9 @@
         <ul class="limits">
           <li><strong>需要瀏覽器支援 Web Bluetooth</strong>：桌機 Chrome / Edge 或 Android Chrome；
             iOS Safari 與 Firefox 不支援。</li>
-          <li><strong>GAN 需要 MAC</strong>：開
+          <li><strong>GAN / QiYi 需要 MAC</strong>：開
             <code>chrome://flags/#enable-experimental-web-platform-features</code> 讓瀏覽器自動抓，
-            或手動輸入一次（會記住這顆方塊）。</li>
+            或手動輸入一次（會記住這顆方塊）。QiYi 通常可由名稱自動推導，推導不對時才會詢問。</li>
           <li><strong>QiYi 三型號（QY-QYSC / Tornado V4-i / V4 LE）皆實機驗收通過</strong>，同一組協議。</li>
           <li>手上型號沒列到？用上方「🔍 診斷方塊 / 🔴 錄製封包」擷取封包，依
             <code>CONTRIBUTING.md</code> 回傳即可協助擴充。</li>
