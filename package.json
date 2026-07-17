@@ -1,6 +1,6 @@
 {
   "name": "maru-smartcube",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "通用智能方塊連線套件 — 讓瀏覽器（Web Bluetooth）連線 GAN / MoYu / QiYi 智能方塊",
   "type": "module",
   "license": "GPL-3.0",
@@ -28,14 +28,16 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE.md"
   ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@types/web-bluetooth": "^0.0.20",

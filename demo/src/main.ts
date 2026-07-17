@@ -30,6 +30,10 @@ const macRemember = document.querySelector<HTMLInputElement>('#mac-remember')!;
 const macDeviceName = document.querySelector<HTMLParagraphElement>('#mac-device-name')!;
 const macOkBtn = document.querySelector<HTMLButtonElement>('#mac-ok')!;
 const macCancelBtn = document.querySelector<HTMLButtonElement>('#mac-cancel')!;
+const macFlagGuide = document.querySelector<HTMLDetailsElement>('#mac-flag-guide')!;
+const macFlagStatus = document.querySelector<HTMLParagraphElement>('#mac-flag-status')!;
+const macFlagUrl = document.querySelector<HTMLElement>('#mac-flag-url')!;
+const macFlagCopyBtn = document.querySelector<HTMLButtonElement>('#mac-flag-copy')!;
 const recordBtn = document.querySelector<HTMLButtonElement>('#record-btn')!;
 const downloadBtn = document.querySelector<HTMLButtonElement>('#download-btn')!;
 const copyBtn = document.querySelector<HTMLButtonElement>('#copy-btn')!;
@@ -255,6 +259,26 @@ function normalizeMac(input: string): string | null {
   return (hex.match(/.{2}/g) ?? []).join(':');
 }
 
+// 「免輸入模式」引導：開啟 Chrome 實驗旗標後 watchAdvertisements 可用，
+// GAN 的 MAC 直接從藍牙廣播自動抓，不再需要本對話框。
+// chrome:// 網址無法從網頁點擊開啟（Chrome 安全限制），故提供一鍵複製讓使用者貼到網址列。
+const FLAG_URL = 'chrome://flags/#enable-experimental-web-platform-features';
+macFlagCopyBtn.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(FLAG_URL);
+    macFlagCopyBtn.textContent = '✓ 已複製，貼到網址列開啟';
+  } catch {
+    // 剪貼簿權限被拒（少見）：反白網址文字讓使用者手動複製。
+    const range = document.createRange();
+    range.selectNodeContents(macFlagUrl);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    macFlagCopyBtn.textContent = '請手動複製反白的網址';
+  }
+  setTimeout(() => (macFlagCopyBtn.textContent = '📋 複製'), 3000);
+});
+
 // 顯示引導對話框取回 MAC；取消回傳 null，勾選「記住」時存入 localStorage。
 function promptMac(device: BluetoothDevice): Promise<string | null> {
   return new Promise((resolve) => {
@@ -262,6 +286,17 @@ function promptMac(device: BluetoothDevice): Promise<string | null> {
     macError.textContent = '';
     macRemember.checked = true;
     macDeviceName.textContent = device.name ? `方塊：${device.name}` : '';
+    // 旗標狀態偵測（watchAdvertisements 存在 = 旗標已開）決定引導的展開與文案：
+    // 未開 → 自動展開引導（這是多數使用者跳到本對話框的原因）；
+    // 已開卻仍跳對話框 → 廣播逾時（方塊休眠/太遠），提示重試即可，引導收合。
+    const flagOn =
+      typeof (device as BluetoothDevice & { watchAdvertisements?: unknown }).watchAdvertisements ===
+      'function';
+    macFlagGuide.open = !flagOn;
+    macFlagStatus.textContent = flagOn
+      ? '✓ 自動偵測已開啟。這次仍跳出視窗代表沒抓到方塊廣播 —— 轉一下方塊喚醒、' +
+        '拉近距離後按「取消」重新連線，或直接手動輸入一次。'
+      : '偵測到你的瀏覽器尚未開啟自動抓取，照以下步驟設定一次：';
 
     const cleanup = (): void => {
       macOkBtn.removeEventListener('click', onOk);

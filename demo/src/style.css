@@ -315,6 +315,52 @@ footer {
   color: #f5734c;
   font-size: 0.85rem;
 }
+.mac-flag-guide {
+  margin: 0 0 0.9rem;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+.mac-flag-guide summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+}
+.mac-flag-guide ol {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+.mac-flag-guide li {
+  margin: 0.35rem 0;
+}
+.mac-flag-status {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+}
+.mac-flag-url {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+.mac-flag-url code {
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(127, 127, 127, 0.15);
+  word-break: break-all;
+  user-select: all; /* 點一下全選，剪貼簿被拒時仍好複製 */
+}
+.mac-flag-url button {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+}
+.mac-flag-note {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+}
+
 .mac-where {
   margin: 0.5rem 0 0.9rem;
   font-size: 0.85rem;

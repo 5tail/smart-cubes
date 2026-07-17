@@ -11,13 +11,21 @@
       交由 gan-web-bluetooth 連線（見 SPEC §5 ADR）。若上游未來開放傳入 device，移除該 shim。
 - [x] Phase 2：QiYi + MoYu driver — 由 csTimer 移植（`qiyicube.js` / `moyu32cube.js`），fixture 測試覆蓋解密/解析；QiYi ACK 邏輯進 driver。共用 `utils/crypto.ts`(AES-128) 與 `utils/facelets.ts`(CubieCube)。（實機驗收待五尾）
 - [x] MAC 記憶（localStorage，SPEC §7 第二層）+ 友善引導對話框（demo）；driver MAC fallback 順序對齊 `gan-web-bluetooth`。GAN 首次一次性輸入後即記住。
-- [ ] **決策層**：MAC 記憶要不要進「套件層」（目前只在 demo）。套件保持純粹、把儲存交給 app（macProvider）是刻意選擇；若未來多個下游都要記憶，再評估是否提供內建 localStorage 版。
-- [x] GAN 自動抓 MAC 需 `chrome://flags/#enable-experimental-web-platform-features`（`watchAdvertisements`）— 已於 README/demo 說明三層 fallback（開旗標自動抓 / 手動輸入一次 / 記憶）。真正零設定需桌面 App（Electron/Tauri，SPEC Phase 4 週賽專案再議）。
+- [x] **決策層（收檔 2026-07-17）**：MAC 記憶**維持 demo 層**。套件保持純粹、儲存交給 app
+      （macProvider）是刻意設計；未來多個下游都要記憶時再重開。
+- [x] GAN 自動抓 MAC 需 `chrome://flags/#enable-experimental-web-platform-features`（`watchAdvertisements`）— 已於 README/demo 說明三層 fallback（開旗標自動抓 / 手動輸入一次 / 記憶）。
+      **2026-07-17 補**：MAC 對話框內建「⚡ 免輸入模式」引導（一鍵複製旗標網址 + 四步驟 +
+      旗標狀態偵測），一般使用者不看 README 也能自助設定。真正零設定需桌面 App
+      （Electron/Tauri，SPEC Phase 4 週賽專案再議）。
 - [x] Phase 3（文件）：README（中英雙語）、CONTRIBUTING、demo 加支援清單與已知限制。
-- [ ] Phase 3（發佈）：npm publish 0.1.0 — **待 QiYi 標準版（QY-QYSC）實機驗過再發**。
+- [x] Phase 3（發佈準備，2026-07-17）：前置條件（QY-QYSC 實機驗證）已滿足。版本 0.1.0、
+      NOTICE.md 隨套件散佈、prepublishOnly 把關、TESTING.md 皆已就緒；
+      **實際 `npm publish` 待套件擁有者執行**（見 PR 發佈 checklist）。發完後把 README
+      兩處「尚未上 npm」字樣移除。
 - [x] `src/core/timesync.ts`（線性回歸時間戳校正，`createTimestampFitter`）。
 - [x] `src/core/connect.ts`（統一入口；品牌偵測待 Phase 2 多品牌整合）。
-- [ ] `src/core/SmartCube.ts`（抽象基底）— 目前 GanDriver 直接實作 `SmartCube` 介面，抽象基底待有第二個 driver 時再視需要抽出。
+- [x] **決策層（收檔 2026-07-17）**：`src/core/SmartCube.ts` 抽象基底**不做**（YAGNI）——
+      三個 driver 直接實作介面至今無重複痛點；若未來新增品牌出現明顯樣板重複再重開。
 - [x] `src/utils/`：`crypto.ts`（最小 AES-128）、`facelets.ts`（CubieCube 狀態/轉動代數）。
 - [x] `tests/fixtures/moyu-real.json`：MoYu WeiLong AI 實機封包（R U F' R' U'），實機驗收通過（解密/解析/重建三層對上方塊自報狀態）。
 - [x] QiYi 實機連線：**QY-QYSC-A / XMD-TornadoV4-i / Tornado V4 LE 三顆實機皆連線並串流成功**。
@@ -32,7 +40,7 @@
       這是 QY 那顆卡住的主因），重連經 `macProvider` 取回真 MAC；記住的 MAC 無法串流時 5 秒自動清除並提示重整。
 - [x] **決策層｜介面**：`resetToSolved(): Promise<void>` 已於 2026-07-13 正式納入 `SmartCube`
       凍結合約（SPEC §3.3 + §5 ADR），三家 driver 具體實作升格，demo 直接呼叫。
-      QiYi 維持重送 hello（協議無 BLE 重置指令，方塊自身會追蹤實體復原）。
+      （QiYi 原「重送 hello」做法已於 2026-07-17 升級為 0x04 狀態覆寫，見下方。）
 - [x] **3D 立體方塊（demo）**：純 CSS 3D transforms（SPEC §5 ADR 2026-07-13），facelets 權威 +
       move 動畫，與 2D 切換並存；幾何映射有 CubieCube 交叉驗證測試。
 - [x] **陀螺儀 3D 姿態（demo，GAN）**：GAN gyro quaternion 驅動 3D 方塊即時翻轉（SPEC §5 ADR
@@ -42,10 +50,9 @@
       實機 259 包翻轉封包破解 —— `0xcc` 框架 `[cc 10 seq ts:2 ?:1 quat(4×int16 BE) crc:2]`，
       offset 6 起四元數 norm 變異僅 0.03%、CRC16/MODBUS 259/259 全中。已在 `protocol.ts`
       實作 `parseGyroQuaternion` + `parseCubeData` 0xcc 分支投遞 gyro 事件，fixture 測試 3 例。
-- [ ] **Tornado V4 陀螺儀座標校正（剩最後一哩）**：封包格式已鎖定、gyro 事件已流出、demo 已
-      渲染，但**四元數分量順序（哪個是 w）與座標系對映未知**（無官方文件）。目前暫用 GAN 的
-      座標轉換當初值 → 方塊會跟著動但軸向可能不對。需一次「已知動作」實機校正：請使用者做
-      指定翻轉（如白上綠前 → 整顆順時針轉 90°）並回報畫面轉向，即可一次解出分量順序 + 軸號。
+- [x] **Tornado V4 陀螺儀座標實機回報跟隨正常（2026-07-17）**：使用者回報 XMD（Tornado V4）
+      3D 跟著實體轉動，暫用的 GAN 座標轉換即正確（或誤差不可感）。若日後發現特定軸鏡像/
+      對調，再做一次「已知動作」校正（白上綠前 → 俯視順時針 90°，回報畫面轉向）。
 - [x] **MoYu 陀螺儀已實作（2026-07-17，決策層）**：格式由三個獨立社群來源交叉驗證
       （lukeburong/weilong-v10-ai-protocol、BTimeApp/BTime、DCTimer-BLE），無需自行錄封包逆向：
       `[0xAB][w,x,y,z 各 int32 LE ÷2^30]`，且須先送 0xAC 開啟指令（byte[2]=1）——
@@ -53,14 +60,13 @@
       driver 連線 init 尾端自動開啟；座標系（x=右,y=後,z=上）與 GAN 相同故原樣透傳。
 - [x] **MoYu 陀螺儀實機驗收通過（2026-07-17，使用者 Android 平板回報）**：3D 跟著魔域
       方塊轉向，文件記載的座標系（與 GAN 相同）原樣透傳即正確，無需軸向校正。
-- [ ] **QiYi 0x04 狀態覆寫實機驗收**：resetToSolved 已改送覆寫指令（文件+三實作交叉驗證，
-      fixture 測試綠燈），待實機在 QY-QYSC 與 Tornado V4 各按一次「六面重置」確認畫面變
-      六面且後續轉動正常。若 Tornado 韌體拒收（文件主要對象是 QY-QYSC），錄封包回報。
+- [x] **QiYi 0x04 狀態覆寫實機驗收通過（2026-07-17，使用者回報）**：奇藝系「六面重置」
+      實機可用，resetToSolved 覆寫指令生效，三品牌重置語意對齊。
 - [ ] MoYu 掉包超過移動封包歷史長度時，重建可能漂移；因「基準後以重建為權威」（ADR 2026-07-13），
       不再能靠方塊自報自動復原。實務上移動封包帶多步歷史可自癒短暫掉包；若實機回報漂移，
       決策層再評估顯式 `recoverState()`（重新以自報狀態為基準）。
 - [ ] demo「🔍 診斷方塊（除錯）」工具：抓廣播（含 MAC）+ 列舉 GATT 服務/特徵值/屬性/可讀值，供未來新型號分析（已就緒）。
-- [ ] **MoYu 廣播 MAC 之謎（決策層複查 2026-07-13 留檔）**：統一入口下廣播解析值曾致金鑰錯
+- [x] **MoYu 廣播 MAC 之謎（收檔 2026-07-17：連線已穩，降級為留檔不追）**：統一入口下廣播解析值曾致金鑰錯
       （已以「名稱推導優先」修復）。但 csTimer 本身是廣播優先且能動 —— 疑似我們解析到
       非 MAC 的 manufacturer data 封包（第一包就收，QiYi 有「含 MAC 的掃描回應較晚到」前科）。
       **一錘定音法**：demo「🔍 診斷方塊」對 WCU_MY32_B6EF 抓 6 秒合併廣播，看各 cic 的
@@ -72,7 +78,8 @@
       不會走到 macProvider 手動）。目前支援清單內無此機型證據，暫不做投機性重試；
       實機回報時再議（可仿 csTimer isWrongKey：解密後 messageType 全非法 → 換下一個 MAC 來源重試）。
 - [ ] MoYu 電量/資訊封包實機 fixture（本次擷取未含 0xA1/0xA4）。
-- [ ] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）。
+- [x] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）——
+      2026-07-17 完成，沉澱三品牌實機驗收流程 + 品牌特例 + 除錯工具 + 發佈前檢查。
 
 ## 範圍外 / 未來（不在 MVP）
 
