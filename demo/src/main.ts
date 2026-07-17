@@ -60,27 +60,25 @@ view3dBtn.addEventListener('click', () => setView('3d'));
 view2dBtn.addEventListener('click', () => setView('2d'));
 setView(localStorage.getItem(VIEW_KEY) === '2d' ? '2d' : '3d');
 
-// --- 陀螺儀姿態（GAN 有原生 gyro 事件；QiYi/MoYu 的 gyro 封包待逆向）---
+// --- 陀螺儀姿態（手動開關）---
+// 預設互動 = 觸控/滑鼠拖曳旋轉 3D（隨時可用）；陀螺儀為選配：偵測到 gyro 事件才亮開關，
+// 由使用者手動開啟（開啟時拖曳暫停、關閉即恢復）。不自動開啟 —— 拖曳優先。
 let gyroOn = false;
-let gyroUserToggled = false; // 使用者是否手動碰過開關（碰過就不再自動開）
 let gyroSeen = false; // 本次連線是否收過 gyro 事件（診斷用）
 function updateGyroHint(): void {
-  if (gyroBtn.disabled) {
-    gyroHint.textContent = '此方塊無陀螺儀資料（目前僅 GAN 有原生 gyro；QiYi/MoYu 待逆向）';
-  } else if (!gyroSeen) {
-    gyroHint.textContent = '轉一下方塊喚醒陀螺儀…（若一直停在這句，代表沒收到 gyro 事件）';
-  } else if (gyroOn) {
-    gyroHint.textContent = '✓ 陀螺儀運作中：翻轉方塊看 3D 跟著轉，可按「校正正面」歸正';
+  if (gyroOn) {
+    gyroHint.textContent = '✓ 陀螺儀驅動中（拖曳暫停）：翻轉實體方塊，按「校正正面」歸正';
+  } else if (gyroSeen) {
+    gyroHint.textContent = '用手指/滑鼠拖曳旋轉 3D ✓ 偵測到陀螺儀，點開關可改由實體方塊驅動';
   } else {
-    gyroHint.textContent = '✓ 偵測到陀螺儀，點「🧭 陀螺儀姿態」啟用';
+    gyroHint.textContent = '用手指/滑鼠拖曳旋轉 3D（偵測到陀螺儀資料時此開關會亮起）';
   }
 }
 function setGyroAvailable(available: boolean): void {
   gyroBtn.disabled = !available;
   if (!available) {
     gyroSeen = false;
-    gyroUserToggled = false;
-    if (gyroOn) toggleGyro(false); // 斷線/換非 GAN 方塊時關閉
+    if (gyroOn) toggleGyro(false); // 斷線/換無陀螺儀方塊時關閉
   }
   updateGyroHint();
 }
@@ -92,21 +90,16 @@ function toggleGyro(on: boolean): void {
   gyroCalibrateBtn.hidden = !on;
   updateGyroHint();
 }
-// gyro 事件（高頻）：更新姿態；首次收到且使用者沒手動切換過 → 自動開啟（連上翻方塊即跟著轉）。
+// gyro 事件（高頻）：更新姿態（僅開關開啟時反映到畫面）；首次收到只「亮開關」，不搶走拖曳。
 function onGyro(quaternion: [number, number, number, number]): void {
   cube3d.setOrientation(quaternion);
   if (!gyroSeen) {
     gyroSeen = true;
-    // 事件驅動啟用：只要有 gyro 事件（不限品牌）就開放開關 —— 未來 QiYi/MoYu gyro 落地時自動生效。
-    if (gyroBtn.disabled) gyroBtn.disabled = false;
-    if (!gyroUserToggled) toggleGyro(true);
-    else updateGyroHint();
+    if (gyroBtn.disabled) gyroBtn.disabled = false; // 事件驅動亮起（不限品牌）
+    updateGyroHint();
   }
 }
-gyroBtn.addEventListener('click', () => {
-  gyroUserToggled = true;
-  toggleGyro(!gyroOn);
-});
+gyroBtn.addEventListener('click', () => toggleGyro(!gyroOn));
 gyroCalibrateBtn.addEventListener('click', () => cube3d.calibrate());
 
 // --- 瀏覽器支援偵測（SPEC §7）---
