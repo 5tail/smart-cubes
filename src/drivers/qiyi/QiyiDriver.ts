@@ -6,10 +6,12 @@ import {
   QIYI_CIC_LIST,
   buildMessage,
   buildHello,
+  buildSyncState,
   decodeNotification,
   parseCubeData,
   defaultMacFromName,
 } from './protocol.js';
+import { SOLVED_FACELET } from '../../utils/facelets.js';
 import { recordPacket } from '../../utils/debug.js';
 
 /**
@@ -109,11 +111,14 @@ export class QiyiDriver extends EventTarget implements SmartCube {
   }
 
   /**
-   * 重置為復原（六面）。QiYi 無 BLE 重置指令，facelets 由方塊自身回報；
-   * 此處重送 hello 讓畫面與方塊當前狀態重新同步（方塊實體復原時即顯示六面）。
+   * 重置為復原（六面）：送 0x04 狀態覆寫指令，把方塊**內部**狀態改寫為復原態
+   * （與 GAN 原生 REQUEST_RESET 同語意；請在實體已復原時按）。方塊會回 0x04 確認包
+   * （帶新 facelets，parseCubeData 投遞 facelets 事件，畫面隨之更新）。
+   * 舊做法「重送 hello 重新同步」在方塊內部追蹤器已亂時無效（同步回來的還是亂的），
+   * 已改為真覆寫（0x04 由 Flying-Toast 協議文件記載、多實作交叉驗證）。
    */
   async resetToSolved(): Promise<void> {
-    await this.requestState();
+    await this.chrct.writeValue(new Uint8Array(buildSyncState(SOLVED_FACELET)).buffer);
   }
 
   async disconnect(): Promise<void> {

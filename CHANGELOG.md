@@ -5,6 +5,27 @@
 
 ## [Unreleased]
 
+### QiYi 六面重置修復 — resetToSolved 改送 0x04 狀態覆寫指令（決策層 2026-07-17）
+
+實機回報：奇藝系（QY-QYSC / Tornado V4）按「六面重置」無效，GAN/MoYu 都正常。
+根因是語意缺口而非 bug：QiYi 每包以**方塊自報狀態**為權威，而舊 `resetToSolved` 只是
+「重送 hello 重新同步」（Phase 2 認知「QiYi 無 BLE 重置指令」）——方塊內部追蹤器已亂時，
+重同步只會把亂的狀態再抓回來，畫面永遠不會變六面。
+
+- **QiYi 其實有狀態覆寫指令（opcode 0x04）**：csTimer 未實作，但 Flying-Toast
+  qiyi_smartcube_protocol 文件記載，並經三個獨立來源交叉驗證 —— huizhiLLL/DCTimer-BLE
+  （`SYNC_STATE_PREFIX` + 2-byte 尾墊）、maggnus/CubeZX3（官方 app 實機抓包「FE 26 04 …」
+  重置封包 + 復原態 27-byte hex）、KittatamSaisaard/qiyi_smartcube_protocol_web。
+- 實作：`protocol.ts` 新增 `encodeFacelet`（`parseFacelet` 的逆）與 `buildSyncState`
+  （內容 = `[0x04, 固定前綴 4B, facelet 27B, 0x00, 0x00]`，framing 後 len=0x26 與抓包一致）；
+  `parseCubeData` 新增 0x04 確認包分支（投遞覆寫後 facelets、**不回 ACK**、lastTs 重設為
+  本包 ts 避免誤補投歷史 move）；`resetToSolved()` 改送 `buildSyncState(SOLVED_FACELET)`。
+- 合約語意升級（僅註解，API 零改動）：types.ts 品牌語意註記由「QiYi 重送 hello 重新同步」
+  改為「0x04 狀態覆寫」——與 GAN 原生 REQUEST_RESET 同級，三品牌重置語意對齊。
+- fixture 測試 +6（`tests/qiyi-sync.test.ts`）：復原態編碼 = CubeZX3 實機抓包 27-byte hex
+  （外部行為錨）、encode/parse 互逆（含實機打亂態）、封包 framing/CRC 自洽、0x04 確認包
+  解析（no-ACK + lastTs 重設）、driver 送覆寫指令與確認包畫面更新；132 例綠燈。
+
 ### 3D 方塊觸控環視 — gyro 模式下拖曳不再停用（決策層 2026-07-17）
 
 前情：**MoYu 陀螺儀實機驗收通過**（使用者 Android 平板回報 3D 跟著魔域方塊轉向）。
