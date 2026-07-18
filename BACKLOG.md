@@ -81,8 +81,8 @@
       （候選逐一驗證、全敗才手動），MoYu 若中獎可移植同模式（驗證訊號改用 isWrongKey）。
 - [x] **QiYi 新裝置 0 封包（2026-07-17 實機回報，已修）**：從未連線過的平板上名稱推導
       MAC 猜錯 → 手動 fallback 不可達 → 死路。`connectQiyiDevice` 改 hello 驗證鏈
-      （見 CHANGELOG），廣播等待 3s→5s。**待實機驗證**：新平板重測魔方格系應出現
-      MAC 對話框（旗標未開時）或直接連上（旗標已開、廣播 5 秒內到）。
+      （見 CHANGELOG），廣播等待 3s→5s。**實機驗收通過（2026-07-18，PR #32 部署後）**：
+      使用者另以兩支從未連線過的 Android 手機實測，三品牌全部正常。
 - [ ] MoYu 電量/資訊封包實機 fixture（本次擷取未含 0xA1/0xA4）。
 - [x] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）——
       2026-07-17 完成，沉澱三品牌實機驗收流程 + 品牌特例 + 除錯工具 + 發佈前檢查。
@@ -93,4 +93,8 @@
 - 陀螺儀 3D 姿態**進階**：長時間漂移校正、慣性平滑（即時 1:1 姿態鏡射 + 手動歸正已於
   2026-07-13 完成，見上方）— SPEC Phase 4。
 - 更多品牌（雨花石等）、iOS（Bluefy）測試 — SPEC Phase 4。
+  **2026-07-18 實機確認 iOS 不可用（預期內）**：iOS 全瀏覽器強制 WebKit 核心，
+  WebKit 不實作 Web Bluetooth（Apple 以隱私為由拒絕），網頁端無解。Phase 4 路線：
+  Bluefy（Web BLE 瀏覽器）煙霧測試，或原生包殼（Capacitor + BLE plugin）；
+  另注意 iOS 原生層也隱藏裝置 MAC，GAN/QiYi 的 MAC 取得屆時是額外關卡。
   （facelets 驅動的 3D 立體方塊 + gyro 即時姿態已於 2026-07-13 提前完成，見上方。）
