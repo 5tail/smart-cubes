@@ -77,6 +77,12 @@
       （csTimer 留 prompt 就是為此），名稱優先會靜默失敗且 fallback 不可達（名稱有值就
       不會走到 macProvider 手動）。目前支援清單內無此機型證據，暫不做投機性重試；
       實機回報時再議（可仿 csTimer isWrongKey：解密後 messageType 全非法 → 換下一個 MAC 來源重試）。
+      **2026-07-17 補**：QiYi 已因同型缺陷實際踩雷（新平板 0 封包）並改為「hello 驗證鏈」
+      （候選逐一驗證、全敗才手動），MoYu 若中獎可移植同模式（驗證訊號改用 isWrongKey）。
+- [x] **QiYi 新裝置 0 封包（2026-07-17 實機回報，已修）**：從未連線過的平板上名稱推導
+      MAC 猜錯 → 手動 fallback 不可達 → 死路。`connectQiyiDevice` 改 hello 驗證鏈
+      （見 CHANGELOG），廣播等待 3s→5s。**待實機驗證**：新平板重測魔方格系應出現
+      MAC 對話框（旗標未開時）或直接連上（旗標已開、廣播 5 秒內到）。
 - [ ] MoYu 電量/資訊封包實機 fixture（本次擷取未含 0xA1/0xA4）。
 - [x] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）——
       2026-07-17 完成，沉澱三品牌實機驗收流程 + 品牌特例 + 除錯工具 + 發佈前檢查。

@@ -33,8 +33,7 @@ export class QiyiDriver extends EventTarget implements SmartCube {
 
   private readonly device: BluetoothDevice;
   private readonly chrct: BluetoothRemoteGATTCharacteristic;
-  /** 本次連線實際使用的 MAC（含由廣播取得的真值）；供 app 記住以利穩定重連。 */
-  readonly mac: string;
+  private _mac: string;
   /** 本次 MAC 的來源（診斷用）：app=macProvider 記住值 / advertisement=廣播 / name=名稱推導 / manual=手動。 */
   macSource: 'app' | 'name' | 'advertisement' | 'manual' | 'unknown' = 'unknown';
   private readonly onValueChanged: (e: Event) => void;
@@ -44,6 +43,13 @@ export class QiyiDriver extends EventTarget implements SmartCube {
   private lastTs = 0;
   private battery = -1;
   private closed = false;
+  // hello 驗證（_helloAndVerify）：等待「任何資料事件」的一次性喚醒鉤子。
+  private notifyDataSeen: (() => void) | null = null;
+
+  /** 本次連線實際使用的 MAC（含由廣播取得的真值）；供 app 記住以利穩定重連。 */
+  get mac(): string {
+    return this._mac;
+  }
 
   constructor(
     device: BluetoothDevice,
@@ -55,7 +61,7 @@ export class QiyiDriver extends EventTarget implements SmartCube {
     this.device = device;
     this.chrct = chrct;
     this.deviceName = deviceName;
-    this.mac = mac;
+    this._mac = mac;
 
     this.onValueChanged = (e) => this.handleNotification(e);
     this.onGattDisconnected = () => {
@@ -89,6 +95,11 @@ export class QiyiDriver extends EventTarget implements SmartCube {
     this.lastTs = lastTs;
     const host = performance.now();
     for (const e of events) {
+      // hello 驗證：方塊只在 hello 帶對 MAC 時才回話，任何狀態/電量/移動事件 = MAC 正確。
+      // gyro 不算數（Tornado 系列姿態串流與 hello 驗證的關係未證實，保守排除）。
+      if (e.type === 'facelets' || e.type === 'battery' || e.type === 'move') {
+        this.notifyDataSeen?.();
+      }
       if (e.type === 'battery') this.battery = e.level;
       if (e.type === 'move') {
         this.emit({ type: 'move', move: e.move, cubeTimestamp: e.cubeTimestamp, hostTimestamp: host });
@@ -102,7 +113,36 @@ export class QiyiDriver extends EventTarget implements SmartCube {
 
   /** QiYi 每個狀態封包都自帶 facelets；重送 hello 可主動取回當前 facelets + battery。 */
   async requestState(): Promise<void> {
-    await this.chrct.writeValue(new Uint8Array(buildHello(this.mac)).buffer);
+    await this.chrct.writeValue(new Uint8Array(buildHello(this._mac)).buffer);
+  }
+
+  /**
+   * @internal 切換目前使用的 MAC 候選（僅供 connectQiyiDevice 的 hello 驗證鏈使用）。
+   */
+  _setMac(mac: string, source: QiyiDriver['macSource']): void {
+    this._mac = mac;
+    this.macSource = source;
+  }
+
+  /**
+   * @internal hello 驗證（僅供 connectQiyiDevice 使用）：以目前 MAC 送出 hello，
+   * 在時限內收到任何資料事件（facelets/battery/move）才算方塊接受這個 MAC。
+   * 機制：QiYi 方塊對「MAC 錯的 hello」完全沉默（0 封包），因此有回話 = MAC 正確。
+   */
+  async _helloAndVerify(timeoutMs: number): Promise<boolean> {
+    const seen = new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => {
+        this.notifyDataSeen = null;
+        resolve(false);
+      }, timeoutMs);
+      this.notifyDataSeen = () => {
+        clearTimeout(timer);
+        this.notifyDataSeen = null;
+        resolve(true);
+      };
+    });
+    await this.requestState();
+    return seen;
   }
 
   /** QiYi 未提供獨立電量查詢；hello 回應含電量，故等同 requestState。 */
@@ -169,7 +209,9 @@ async function readMacFromAdvertisement(device: BluetoothDevice): Promise<string
         }
       }
     };
-    const timer = setTimeout(() => finish(null), 3000);
+    // 5 秒：QiYi「含 MAC 的掃描回應」可能比第一包廣播晚到（診斷工具因此收 6 秒），
+    // 3 秒在部分 Android 平板上等不到。廣播只能在 gatt.connect() 前讀（連線中不廣播）。
+    const timer = setTimeout(() => finish(null), 5000);
     device.addEventListener('advertisementreceived', onAdv as EventListener);
     dev.watchAdvertisements().catch(() => finish(null));
   });
@@ -189,39 +231,67 @@ export async function connectQiyiCube(options: ConnectOptions = {}): Promise<Qiy
   return connectQiyiDevice(device, options);
 }
 
-/** 對「已選好的裝置」建立 QiYi 連線（統一選擇視窗 connectSmartCube 的分派目標）。 */
+// hello 驗證每個 MAC 候選的等待時間：實機正確 MAC 的 hello 回應通常 <300ms，
+// 1.5 秒已含餘裕；三候選全跑最壞 4.5 秒，仍在 demo 的 6 秒看門狗之內。
+const HELLO_VERIFY_MS = 1500;
+
+/**
+ * 對「已選好的裝置」建立 QiYi 連線（統一選擇視窗 connectSmartCube 的分派目標）。
+ *
+ * MAC fallback（SPEC §7）改為「hello 驗證鏈」（2026-07-17 決策層）：
+ * macProvider 記住值 → 廣播 → 名稱推導 依序當**候選**，每個候選送 hello 後等回話，
+ * 有資料才算數；全部沉默才走 macProvider 手動輸入（app 層對話框含旗標引導）。
+ * 動機：QiYi 對錯 MAC 的 hello 完全沉默（0 封包），而名稱推導是 best-effort 猜測
+ * （csTimer 原作僅當 prompt 預設值）——舊版把它當權威來源，猜錯時手動 fallback
+ * 永遠不可達，在「無記憶、無廣播（旗標未開）」的新裝置上變成死路。
+ */
 export async function connectQiyiDevice(
   device: BluetoothDevice,
   options: ConnectOptions = {},
 ): Promise<QiyiDriver> {
   const deviceName = (device.name ?? '').trim();
 
-  // MAC fallback（SPEC §7）：macProvider 記住的值 → 廣播資料 → 名稱推導 → macProvider 手動輸入。
-  let source: QiyiDriver['macSource'] = 'unknown';
-  let mac = (options.macProvider && (await options.macProvider(device, false))) || null;
-  if (mac) source = 'app';
-  if (!mac) {
-    mac = await readMacFromAdvertisement(device);
-    if (mac) source = 'advertisement';
+  // 蒐集候選（廣播必須在 gatt.connect() 前讀——BLE 裝置連線中不廣播）。
+  const candidates: Array<{ mac: string; source: QiyiDriver['macSource'] }> = [];
+  const push = (mac: string | null, source: QiyiDriver['macSource']): void => {
+    if (mac && !candidates.some((c) => c.mac === mac)) candidates.push({ mac, source });
+  };
+  push((options.macProvider && (await options.macProvider(device, false))) || null, 'app');
+  push(await readMacFromAdvertisement(device), 'advertisement');
+  push(defaultMacFromName(deviceName), 'name');
+  if (candidates.length === 0 && !options.macProvider) {
+    throw new Error('QiYi 方塊需要 MAC address 才能建立連線，且無法自動取得');
   }
-  if (!mac) {
-    mac = defaultMacFromName(deviceName);
-    if (mac) source = 'name';
-  }
-  if (!mac && options.macProvider) {
-    mac = await options.macProvider(device, true);
-    if (mac) source = 'manual';
-  }
-  if (!mac) throw new Error('QiYi 方塊需要 MAC address 才能建立連線，且無法自動取得');
 
   const gatt = await device.gatt!.connect();
   const service = await gatt.getPrimaryService(QIYI_SERVICE_UUID);
   const chrct = await service.getCharacteristic(QIYI_CHRCT_UUID);
   await chrct.startNotifications();
 
-  const driver = new QiyiDriver(device, chrct, deviceName, mac);
-  driver.macSource = source;
-  // 送出 hello 開始串流（方塊會回 hello 封包，內含 facelets + battery）。
-  await chrct.writeValue(new Uint8Array(buildHello(mac)).buffer);
+  const driver = new QiyiDriver(device, chrct, deviceName, candidates[0]?.mac ?? '');
+
+  // hello 驗證鏈：依序試每個候選，方塊有回話（facelets/battery/move）即定案。
+  for (const cand of candidates) {
+    driver._setMac(cand.mac, cand.source);
+    if (await driver._helloAndVerify(HELLO_VERIFY_MS)) return driver;
+  }
+
+  // 自動候選全部沉默 → 手動輸入（app 層對話框；使用者可循引導開旗標後重連）。
+  if (options.macProvider) {
+    const manual = await options.macProvider(device, true);
+    if (manual) {
+      driver._setMac(manual, 'manual');
+      await driver.requestState(); // 送 hello；成敗交由 app 層（如 demo 看門狗）回報
+      return driver;
+    }
+  }
+
+  if (candidates.length === 0) {
+    // 連手動都沒有：釋放連線再丟錯（死連線會讓方塊之後完全連不到）。
+    await driver.disconnect();
+    throw new Error('QiYi 方塊需要 MAC address 才能建立連線，且無法自動取得');
+  }
+  // 有候選但全部無回應且使用者未手動輸入：回傳 driver（保留最後一個候選），
+  // 由 app 層看門狗以 mac/macSource 診斷資訊提示下一步。
   return driver;
 }
