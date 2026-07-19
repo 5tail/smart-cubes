@@ -218,6 +218,28 @@ button.ghost {
   display: none;
 }
 
+.device-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+}
+.device-line .device {
+  margin: 0;
+}
+/* 品牌 LOGO：淺色圓角底板，確保深色/黑字 LOGO 在深色底 (#0f1115) 也清楚可見；
+   白/淺色 LOGO 放上去也不突兀。高度固定、寬度自適應（等高並排規範，SPEC §3.2）。 */
+.brand-logo {
+  height: 24px;
+  width: auto;
+  max-width: 96px;
+  padding: 3px 6px;
+  background: #fff;
+  border-radius: 6px;
+  object-fit: contain;
+  flex: none;
+}
+
 .device {
   margin: 0.75rem 0 0;
   color: var(--muted);

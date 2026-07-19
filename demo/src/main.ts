@@ -8,6 +8,24 @@ import type { CubeEvent, SmartCube } from '../../src/core/types';
 import { CubieCube, moveCube, moveStringToIndex } from '../../src/utils/facelets';
 import { renderFacelets, renderSolved } from './cubeMap';
 import { createCube3d } from './cube3d';
+import { displayBrand, DISPLAY_BRAND_LABEL, type DisplayBrand } from './brandLogo';
+
+// 品牌 LOGO：Vite 打包時把 assets/brands/ 下的圖檔解析成帶 base 的雜湊網址
+// （子路徑部署安全）。使用者只要把 <key>.svg / <key>.png 丟進資料夾即自動接上；
+// 同 key 同時有 svg 與 png 時 svg 優先。缺圖的品牌不顯示圖（優雅退回純文字）。
+const brandLogoUrls = import.meta.glob('./assets/brands/*.{svg,png}', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>;
+const brandLogoMap: Partial<Record<DisplayBrand, string>> = {};
+for (const [path, url] of Object.entries(brandLogoUrls)) {
+  const m = /\/([a-z0-9]+)\.(svg|png)$/.exec(path);
+  if (!m) continue;
+  const key = m[1] as DisplayBrand;
+  if (brandLogoMap[key] && m[2] === 'png') continue; // 已有（含 svg）且此為 png → 保留原本
+  brandLogoMap[key] = url;
+}
 
 const connectBtn = document.querySelector<HTMLButtonElement>('#connect-btn')!;
 const disconnectBtn = document.querySelector<HTMLButtonElement>('#disconnect-btn')!;
@@ -23,6 +41,7 @@ const view3dBtn = document.querySelector<HTMLButtonElement>('#view-3d-btn')!;
 const view2dBtn = document.querySelector<HTMLButtonElement>('#view-2d-btn')!;
 const batteryEl = document.querySelector<HTMLSpanElement>('#battery')!;
 const deviceNameEl = document.querySelector<HTMLParagraphElement>('#device-name')!;
+const brandLogoEl = document.querySelector<HTMLImageElement>('#brand-logo')!;
 const macDialog = document.querySelector<HTMLDialogElement>('#mac-dialog')!;
 const macInput = document.querySelector<HTMLInputElement>('#mac-input')!;
 const macError = document.querySelector<HTMLParagraphElement>('#mac-error')!;
@@ -216,12 +235,30 @@ function onCubeEvent(e: Event): void {
   if (event.type === 'disconnected') teardown();
 }
 
+// 顯示品牌 LOGO（有對應圖檔才顯示；缺圖優雅退回純文字，不報錯）。
+function showBrandLogo(db: DisplayBrand): void {
+  const url = brandLogoMap[db];
+  if (!url) {
+    hideBrandLogo();
+    return;
+  }
+  brandLogoEl.src = url;
+  brandLogoEl.alt = DISPLAY_BRAND_LABEL[db];
+  brandLogoEl.hidden = false;
+}
+function hideBrandLogo(): void {
+  brandLogoEl.hidden = true;
+  brandLogoEl.removeAttribute('src');
+  brandLogoEl.alt = '';
+}
+
 function teardown(): void {
   if (cube) {
     for (const t of EVENT_TYPES) cube.removeEventListener(t, onCubeEvent);
     cube = null;
   }
   deviceNameEl.textContent = '';
+  hideBrandLogo();
   setConnected(false, '未連線');
   setGyroAvailable(false); // 斷線：停用陀螺儀（若開著會一併關閉）
 }
@@ -387,6 +424,7 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
     }, 6000);
     lastCubeBrand = cube.brand;
     lastCubeName = cube.deviceName;
+    showBrandLogo(displayBrand(cube.brand, cube.deviceName));
     deviceNameEl.textContent = `已連線：${cube.deviceName}（${cube.brand}）${macInfo}`;
     setConnected(true, '已連線');
     // GAN 原生串流；MoYu 由 driver 送開啟指令（0xAC）後串流；QiYi 僅 Tornado V4 系列有
