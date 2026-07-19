@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+### 品牌 LOGO 展示（demo）— 連線行依品牌顯示 LOGO（決策層 2026-07-18）
+
+實作 SPEC_BRAND_LOGOS.md：連上方塊時，連線行顯示對應品牌 LOGO。
+
+- `demo/src/brandLogo.ts`：純函式 `displayBrand(brand, deviceName)` 把協議 brand
+  （gan/moyu/qiyi）映射為顯示品牌（gan/moyu/qiyi/**mofangge**）——奇藝與魔方格共用
+  同一 QiYi driver，靠裝置名稱前綴（`XMD`→魔方格，其餘 qiyi→奇藝）細分，**不動凍結合約**。
+- `main.ts`：`import.meta.glob` 解析 `assets/brands/*.{svg,png}` 為帶 base 的雜湊網址
+  （子路徑部署安全、svg 優先於 png）；連線行插入 `<img>`，缺圖優雅退回純文字。
+- LOGO 墊**淺色圓角底板**：確保深色/黑字 LOGO 在 demo 深底（`#0f1115`）也清楚可見
+  （使用者首個 moyu.png 為黑字透明底，實測深底幾乎不可見 → 底板為通用解）。
+- fixture 測試 +6（`tests/brand-logo.test.ts`）：前綴映射（大小寫/空白/預設）、標籤齊全；
+  144 例綠燈。demo typecheck / build 通過，moyu.png 正確打包進 dist。
+
 ### DEPLOY.md 新增 — 展示頁自架部署指南（決策層 2026-07-18）
 
 使用者要把展示頁架到自己的網站（`https://maru.tw/app/smartcubes`，手動 build + 上傳）。
