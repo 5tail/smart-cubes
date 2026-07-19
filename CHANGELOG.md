@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### package.json 新增 prepare script — 支援 git 依賴安裝（決策層 2026-07-19）
+
+下游專案（MaruCube Arena）在套件發布 npm 前需以 git 依賴安裝
+（`npm install github:5tail/smart-cubes`）。git 依賴不含 `dist/` 產物，
+npm 會在安裝時執行 `prepare` script 現場 build——新增 `"prepare": "npm run build"`
+一行使其可用。副作用僅本 repo 本機 `npm install` 後會多跑一次 tsup（數秒）。
+公開 API 與程式碼零改動。
+
 ### DEPLOY.md 新增 — 展示頁自架部署指南（決策層 2026-07-18）
 
 使用者要把展示頁架到自己的網站（`https://maru.tw/app/smartcubes`，手動 build + 上傳）。
