@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+### DEPLOY.md 新增 — 展示頁自架部署指南（決策層 2026-07-18）
+
+使用者要把展示頁架到自己的網站（`https://maru.tw/app/smartcubes`，手動 build + 上傳）。
+新增 `DEPLOY.md`：以該路徑為實例的完整步驟（`--base` CLI 覆寫、傳 dist「內容」、nginx 範例、
+驗證清單）、需手工修改的文字清單（必改僅 `--base` 一項）、注意重點（HTTPS 硬需求、
+index.html no-cache、MAC 記憶跟網域走、iOS 平台限制）與日後更新流程。
+README 中英兩處 demo 章節補上連結。文件所載 build 指令已實際執行驗證
+（產出資源前綴 `/app/smartcubes/` 正確）。`demo/vite.config.ts` 零改動
+（GitHub Pages 的 base 保留，自架一律用 CLI 覆寫）。
+
 ### QiYi 新裝置 0 封包修復 — MAC fallback 改為 hello 驗證鏈（決策層 2026-07-17）
 
 實機回報：另一台**從未連線過**的 Android 平板上，GAN/MoYu 正常，奇藝（魔方格）系
