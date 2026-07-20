@@ -392,7 +392,7 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
     cube = await connectFn();
     for (const t of EVENT_TYPES) cube.addEventListener(t, onCubeEvent);
     // MAC 診斷資訊（QiYi/MoYu/GAN driver 皆暴露 mac；QiYi/MoYu 另有來源）。
-    const diag = cube as Partial<{ mac: string; macSource: string }>;
+    const diag = cube as Partial<{ mac: string; macSource: string; writeMode: string }>;
     const SOURCE_LABEL: Record<string, string> = {
       app: '記住值',
       name: '名稱推導',
@@ -403,6 +403,8 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
     const macInfo = diag.mac
       ? ` · MAC ${diag.mac}${diag.macSource ? `（${SOURCE_LABEL[diag.macSource] ?? diag.macSource}）` : ''}`
       : '';
+    // MoYu 寫入模式 fallback 鏈（桌機 without-response 丟包嫌疑）啟動時標示出來，供實機驗收判讀。
+    const writeInfo = diag.writeMode === 'withResponse' ? ' · 寫入 with-response' : '';
     // 看門狗（所有品牌、所有 MAC 來源）：連上 6 秒沒任何資料 = 金鑰/MAC 幾乎肯定不對，
     // 直接把用到的 MAC 與下一步顯示在 log，不再靜默。用了記住值時順便清除讓下次重抓。
     const deviceForRecovery = pendingDevice;
@@ -425,7 +427,7 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
     lastCubeBrand = cube.brand;
     lastCubeName = cube.deviceName;
     showBrandLogo(displayBrand(cube.brand, cube.deviceName));
-    deviceNameEl.textContent = `已連線：${cube.deviceName}（${cube.brand}）${macInfo}`;
+    deviceNameEl.textContent = `已連線：${cube.deviceName}（${cube.brand}）${macInfo}${writeInfo}`;
     setConnected(true, '已連線');
     // GAN 原生串流；MoYu 由 driver 送開啟指令（0xAC）後串流；QiYi 僅 Tornado V4 系列有
     // 姿態封包 → 靠事件驅動啟用（首個 gyro 事件到達時自動開放開關）。
