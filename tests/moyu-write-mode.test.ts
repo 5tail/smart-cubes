@@ -17,17 +17,26 @@ interface WriteModeMockOpts {
   respondWithoutResponse: boolean;
   /** with-response（writeValue）寫入是否會讓方塊回話。 */
   respondWithResponse: boolean;
+  /** without-response 寫入直接 reject（平台丟例外而非靜默丟包的變體）。 */
+  throwWithoutResponse?: boolean;
+  /** getPrimaryService 直接 reject（桌機 GATT 快取/服務探索失敗情境）。 */
+  failService?: boolean;
+  /** startNotifications 直接 reject。 */
+  failNotifications?: boolean;
 }
 
 function makeWriteModeMock(name: string, opts: WriteModeMockOpts): {
   device: BluetoothDevice;
   writeValueSpy: ReturnType<typeof vi.fn>;
   withoutResponseSpy: ReturnType<typeof vi.fn>;
+  disconnectSpy: ReturnType<typeof vi.fn>;
 } {
   class Chrct extends EventTarget {
     value: DataView | null = null;
     properties = { writeWithoutResponse: opts.supportsWithoutResponse };
-    startNotifications = vi.fn(() => Promise.resolve(this));
+    startNotifications = vi.fn(() =>
+      opts.failNotifications ? Promise.reject(new Error('GATT Error Unknown')) : Promise.resolve(this),
+    );
     stopNotifications = vi.fn(() => Promise.resolve(this));
     writeValue = vi.fn(() => Promise.resolve());
     notify(bytes: number[]): void {
@@ -43,6 +52,7 @@ function makeWriteModeMock(name: string, opts: WriteModeMockOpts): {
   });
   write.writeValue = writeValueSpy;
   const withoutResponseSpy = vi.fn(() => {
+    if (opts.throwWithoutResponse) return Promise.reject(new Error('GATT operation failed'));
     if (opts.respondWithoutResponse) queueMicrotask(() => read.notify(packets.state.enc));
     return Promise.resolve();
   });
@@ -52,14 +62,17 @@ function makeWriteModeMock(name: string, opts: WriteModeMockOpts): {
   const service = {
     getCharacteristic: vi.fn((uuid: string) => Promise.resolve(uuid.endsWith('cb1') ? read : write)),
   };
+  const disconnectSpy = vi.fn();
   const gatt = {
     connect: vi.fn(() => Promise.resolve(gatt)),
-    getPrimaryService: vi.fn(() => Promise.resolve(service)),
-    disconnect: vi.fn(),
+    getPrimaryService: vi.fn(() =>
+      opts.failService ? Promise.reject(new Error('No Services matching UUID')) : Promise.resolve(service),
+    ),
+    disconnect: disconnectSpy,
   };
   const device = new EventTarget() as unknown as BluetoothDevice;
   Object.assign(device, { name, gatt });
-  return { device, writeValueSpy, withoutResponseSpy };
+  return { device, writeValueSpy, withoutResponseSpy, disconnectSpy };
 }
 
 const rememberMac = { macProvider: (_d: BluetoothDevice, fb: boolean) => Promise.resolve(fb ? null : packets.mac) };
@@ -121,5 +134,57 @@ describe('connectMoyuDevice — 寫入模式 fallback 鏈', () => {
     expect(writeValueSpy).toHaveBeenCalled();
     expect(withoutResponseSpy).not.toHaveBeenCalled();
     await driver.disconnect();
+  });
+
+  it('探測期 without-response 寫入丟例外 → 立即判失敗（不吞不白等），第二輪 with-response 救回', async () => {
+    const { device, writeValueSpy } = makeWriteModeMock('WCU_MY32_ABCD', {
+      supportsWithoutResponse: true,
+      respondWithoutResponse: false,
+      throwWithoutResponse: true, // 平台丟例外變體（非靜默丟包）
+      respondWithResponse: true,
+    });
+    const driver = await connectMoyuDevice(device, rememberMac, 5000); // 長 timeout：fast-fail 不會等它
+    expect(driver.writeMode).toBe('withResponse');
+    expect(driver.macSource).toBe('app');
+    expect(writeValueSpy).toHaveBeenCalled();
+    await driver.disconnect();
+  }, 2000); // 測試逾時 < 探測逾時：證明例外走 fast-fail 而非等 5 秒
+
+  it('盲連後 init 寫入丟例外 → 就地改 with-response 續行，連線不炸', async () => {
+    // 兩輪探測都失敗（without-response 丟例外、with-response 靜默）→ 盲連回平台偏好模式
+    // → init 寫入丟例外 → 就地切 with-response 完成 init。
+    const { device, writeValueSpy } = makeWriteModeMock('WCU_MY32_ABCD', {
+      supportsWithoutResponse: true,
+      respondWithoutResponse: false,
+      throwWithoutResponse: true,
+      respondWithResponse: false,
+    });
+    const driver = await connectMoyuDevice(device, {}, 20);
+    expect(driver.macSource).toBe('name'); // 盲連（名稱推導）
+    expect(driver.writeMode).toBe('withResponse'); // init 例外後就地切換
+    expect(writeValueSpy).toHaveBeenCalled(); // init 四筆請求以 writeValue 補寫完成
+    await driver.disconnect();
+  });
+
+  it('找服務失敗 → 錯誤標明階段，且釋放 GATT（死連線會讓方塊之後連不到）', async () => {
+    const { device, disconnectSpy } = makeWriteModeMock('WCU_MY32_ABCD', {
+      supportsWithoutResponse: true,
+      respondWithoutResponse: true,
+      respondWithResponse: true,
+      failService: true,
+    });
+    await expect(connectMoyuDevice(device, {}, 20)).rejects.toThrow(/找服務/);
+    expect(disconnectSpy).toHaveBeenCalled();
+  });
+
+  it('開啟通知失敗 → 錯誤標明階段，且釋放 GATT', async () => {
+    const { device, disconnectSpy } = makeWriteModeMock('WCU_MY32_ABCD', {
+      supportsWithoutResponse: true,
+      respondWithoutResponse: true,
+      respondWithResponse: true,
+      failNotifications: true,
+    });
+    await expect(connectMoyuDevice(device, {}, 20)).rejects.toThrow(/開啟通知/);
+    expect(disconnectSpy).toHaveBeenCalled();
   });
 });
