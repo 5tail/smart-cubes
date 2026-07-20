@@ -48,6 +48,8 @@ export class MoyuDriver extends EventTarget implements SmartCube {
   readonly mac: string;
   /** 本次 MAC 的來源（診斷用）：app=macProvider 記住值 / name=名稱推導 / advertisement=廣播 / manual=手動。 */
   macSource: 'app' | 'name' | 'advertisement' | 'manual' | 'unknown' = 'unknown';
+  /** 本次連線實際使用的寫入模式（診斷用；探測期由 fallback 鏈定案，見 connectMoyuDevice）。 */
+  readonly writeMode: MoyuWriteMode;
   private readonly onValueChanged: (e: Event) => void;
   private readonly onGattDisconnected: () => void;
 
@@ -62,6 +64,7 @@ export class MoyuDriver extends EventTarget implements SmartCube {
     chrctWrite: BluetoothRemoteGATTCharacteristic,
     deviceName: string,
     mac: string,
+    writeMode?: MoyuWriteMode,
   ) {
     super();
     this.device = device;
@@ -69,6 +72,7 @@ export class MoyuDriver extends EventTarget implements SmartCube {
     this.chrctWrite = chrctWrite;
     this.deviceName = deviceName;
     this.mac = mac;
+    this.writeMode = writeMode ?? preferredWriteMode(chrctWrite);
     const { key, iv } = deriveKeyIv(mac);
     this.aes = new Aes128(key);
     this.iv = iv;
@@ -155,7 +159,7 @@ export class MoyuDriver extends EventTarget implements SmartCube {
   }
 
   private async sendRequest(opcode: number): Promise<void> {
-    await writeCommand(this.chrctWrite, encode(buildRequest(opcode), this.aes, this.iv));
+    await writeCommand(this.chrctWrite, encode(buildRequest(opcode), this.aes, this.iv), this.writeMode);
   }
 
   /** 主動要求方塊回報 facelets（opcode 163）。 */
@@ -248,19 +252,34 @@ export async function connectMoyuCube(options: ConnectOptions = {}): Promise<Moy
 const MOYU_VALID_TYPES = new Set([OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY, OPCODE_MOVE, OPCODE_GYRO]);
 
 /**
- * 對 MoYu 寫入指令。`writeValue` 的寫入模式（with/without response）各平台實作不一
- * （桌機/Android 可能不同），特徵值支援 writeWithoutResponse 時明確採用之，否則退回 writeValue。
- * 疑似「桌機能動、Android 平板方塊完全沉默」的成因之一（實機 0 封包擷取，2026-07-16）。
+ * MoYu 寫入模式。兩個方向都有實機前科：Android 平板需要 without-response 才不沉默
+ * （2026-07-16，commit 67db315），筆電（桌機藍牙堆疊）則相反 —— without-response 疑似被
+ * 靜默丟包、with-response（桌機時代的 writeValue）才通（2026-07-19 實機回報「平板正常、
+ * 筆電連上無訊號」）。故探測期以 fallback 鏈定案，連線全程沿用勝出的模式。
  */
+export type MoyuWriteMode = 'withoutResponse' | 'withResponse';
+
+/** 平台偏好的寫入模式：特徵值宣告支援且 API 存在 → without-response（平板實證），否則 with-response。 */
+function preferredWriteMode(chrct: BluetoothRemoteGATTCharacteristic): MoyuWriteMode {
+  const c = chrct as BluetoothRemoteGATTCharacteristic & {
+    writeValueWithoutResponse?: (b: BufferSource) => Promise<void>;
+  };
+  return chrct.properties?.writeWithoutResponse && typeof c.writeValueWithoutResponse === 'function'
+    ? 'withoutResponse'
+    : 'withResponse';
+}
+
+/** 對 MoYu 以指定模式寫入指令（模式選擇見 MoyuWriteMode 說明）。 */
 async function writeCommand(
   chrct: BluetoothRemoteGATTCharacteristic,
   bytes: readonly number[],
+  mode: MoyuWriteMode,
 ): Promise<void> {
   const buf = new Uint8Array(bytes).buffer;
   const c = chrct as BluetoothRemoteGATTCharacteristic & {
     writeValueWithoutResponse?: (b: BufferSource) => Promise<void>;
   };
-  if (chrct.properties?.writeWithoutResponse && typeof c.writeValueWithoutResponse === 'function') {
+  if (mode === 'withoutResponse' && typeof c.writeValueWithoutResponse === 'function') {
     await c.writeValueWithoutResponse(buf);
   } else {
     await chrct.writeValue(buf);
@@ -276,6 +295,7 @@ async function probeMoyuKey(
   chrctRead: BluetoothRemoteGATTCharacteristic,
   chrctWrite: BluetoothRemoteGATTCharacteristic,
   mac: string,
+  writeMode: MoyuWriteMode,
   timeoutMs: number,
 ): Promise<boolean> {
   const { key, iv } = deriveKeyIv(mac);
@@ -302,8 +322,8 @@ async function probeMoyuKey(
     chrctRead.addEventListener('characteristicvaluechanged', onValue);
     // 照實機驗收過的握手順序：先 INFO 再 STATE（部分韌體可能要求先收到 INFO 才回話）。
     void (async () => {
-      await writeCommand(chrctWrite, encode(buildRequest(OPCODE_INFO), aes, iv));
-      await writeCommand(chrctWrite, encode(buildRequest(OPCODE_STATE), aes, iv));
+      await writeCommand(chrctWrite, encode(buildRequest(OPCODE_INFO), aes, iv), writeMode);
+      await writeCommand(chrctWrite, encode(buildRequest(OPCODE_STATE), aes, iv), writeMode);
     })().catch(() => {});
   });
 }
@@ -315,7 +335,12 @@ async function probeMoyuKey(
  * 用「能解出合法封包」的那組（csTimer isWrongKey 精神，自我修正）。候選順序：
  * macProvider 記住值 → 名稱推導 → 廣播（**不含手動輸入**：魔域使用者無從得知 MAC）。
  *
- * 探測都沒通過但至少有候選 → 用最可能的（名稱推導優先）直接連上，不跳輸入框，
+ * 寫入模式 fallback 鏈（QiYi hello 驗證鏈同精神）：先以平台偏好模式（without-response）
+ * 探測全候選；全滅時改用 with-response 重探一輪 —— 部分桌機藍牙堆疊會靜默丟棄
+ * without-response 寫入（「平板正常、筆電連上無訊號」，2026-07-19 實機回報；
+ * 正是 67db315「桌機能動、平板全滅」的鏡像）。哪種模式有回話，整條連線沿用該模式。
+ *
+ * 兩輪探測都沒通過但至少有候選 → 用最可能的（名稱推導優先）直接連上，不跳輸入框，
  * 交由畫面看門狗判斷是否真的沒串流。完全無候選 MAC → disconnect 釋放 GATT 再拋錯。
  *
  * @param probeTimeoutMs 每個候選金鑰的探測逾時（測試可縮短）。
@@ -340,15 +365,27 @@ export async function connectMoyuDevice(
     { source: 'advertisement', get: async () => readMacFromAdvertisement(device) },
   ];
 
+  let writeMode = preferredWriteMode(chrctWrite);
   const resolved: Array<{ mac: string; source: MoyuDriver['macSource'] }> = [];
   let chosen: { mac: string; source: MoyuDriver['macSource'] } | null = null;
   for (const s of specs) {
     const mac = await s.get();
     if (!mac) continue;
     resolved.push({ mac, source: s.source });
-    if (await probeMoyuKey(chrctRead, chrctWrite, mac, probeTimeoutMs)) {
+    if (await probeMoyuKey(chrctRead, chrctWrite, mac, writeMode, probeTimeoutMs)) {
       chosen = { mac, source: s.source };
       break;
+    }
+  }
+  // 第二輪：候選全滅且第一輪走 without-response → 改 with-response 重探（桌機丟包嫌疑）。
+  // 第一輪全滅時 specs 已全數 resolve，直接重用 resolved（避免廣播再等一次 3 秒）。
+  if (!chosen && writeMode === 'withoutResponse') {
+    for (const r of resolved) {
+      if (await probeMoyuKey(chrctRead, chrctWrite, r.mac, 'withResponse', probeTimeoutMs)) {
+        chosen = r;
+        writeMode = 'withResponse';
+        break;
+      }
     }
   }
   if (!chosen) {
@@ -359,18 +396,19 @@ export async function connectMoyuDevice(
     // 探測都沒通過：**不跳輸入框**，改用最可能的候選（名稱推導優先）直接連上；
     // 若真的沒串流，畫面看門狗會 6 秒後報出並斷線 —— 那代表此韌體金鑰算法尚未支援（需錄封包逆向）。
     chosen = resolved.find((r) => r.source === 'name') ?? resolved[0]!;
+    writeMode = preferredWriteMode(chrctWrite); // 盲連時回到平台偏好模式（現行行為不變）
   }
 
-  const driver = new MoyuDriver(device, chrctRead, chrctWrite, deviceName, chosen.mac);
+  const driver = new MoyuDriver(device, chrctRead, chrctWrite, deviceName, chosen.mac, writeMode);
   driver.macSource = chosen.source;
   // 依序要求硬體資訊、初始狀態、電量（初始狀態封包提供 facelet 基準與 move 計數起點）。
   const { key, iv } = deriveKeyIv(chosen.mac);
   const aes = new Aes128(key);
   for (const opcode of [OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY]) {
-    await writeCommand(chrctWrite, encode(buildRequest(opcode), aes, iv));
+    await writeCommand(chrctWrite, encode(buildRequest(opcode), aes, iv), writeMode);
   }
   // 開啟陀螺儀串流（opcode 172）：方塊預設不送 gyro，須主動開啟。放在三個請求之後，
   // 即使個別韌體不認得此指令，state/battery 已請求完畢、基本功能不受影響。
-  await writeCommand(chrctWrite, encode(buildGyroControl(true), aes, iv));
+  await writeCommand(chrctWrite, encode(buildGyroControl(true), aes, iv), writeMode);
   return driver;
 }

@@ -5,6 +5,27 @@
 
 ## [Unreleased]
 
+### MoYu 筆電無訊號修復 — 寫入模式 fallback 鏈（決策層 2026-07-20）
+
+實機回報（2026-07-19）：兩台平板連魔域正常，**筆電連上魔域卻無訊號**（看門狗 6 秒斷線）。
+同一顆方塊、同一名稱 → 名稱推導金鑰兩邊相同（平板實證金鑰正確），問題必在 I/O 層。
+主嫌是 67db315（2026-07-16）：為救「平板 0 封包」把寫入全面改 writeWithoutResponse ——
+而該 commit 自述「桌機時代能動（writeValue）、平板全滅」，現況正是其鏡像：部分桌機
+藍牙堆疊疑似靜默丟棄 without-response 寫入，指令根本沒到方塊。旁證：QiYi driver 全程
+用 writeValue，同一台筆電上唯獨魔域（唯一改 without-response 的品牌）失效。
+
+- **寫入模式 fallback 鏈**（QiYi hello 驗證鏈同精神）：金鑰探測先以平台偏好模式
+  （without-response）跑全候選 MAC；全滅時改用 with-response（writeValue）重探一輪
+  （重用第一輪 resolve 的候選，不再等廣播）；哪種模式有回話，整條連線（init 請求、
+  sendRequest、gyro 開啟）沿用該模式。平板現行路徑第一輪即定案，行為零改變。
+- 兩輪全滅 → 維持現行盲連行為（名稱推導直連 + 平台偏好模式，交看門狗）；特徵值
+  不宣告 writeWithoutResponse → 只跑 with-response 一輪（等同舊 writeValue 路徑）。
+- `MoyuDriver.writeMode` 新增診斷欄位（同 `macSource` 定位）；demo 連線行在 fallback
+  模式勝出時標示「· 寫入 with-response」，供筆電實機驗收判讀。凍結合約 `types.ts` 零改動。
+- fixture 測試 +4（`tests/moyu-write-mode.test.ts`）：mock 方塊「只認其中一種寫入模式
+  才回話」，覆蓋平板情境（第一輪定案）、筆電情境（第二輪救回且後續請求沿用）、
+  兩模式全滅盲連、特徵值不支援 without-response；148 例綠燈。
+
 ### 品牌 LOGO 展示（demo）— 連線行依品牌顯示 LOGO（決策層 2026-07-18）
 
 實作 SPEC_BRAND_LOGOS.md：連上方塊時，連線行顯示對應品牌 LOGO。
