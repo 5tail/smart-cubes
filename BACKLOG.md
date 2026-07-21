@@ -83,6 +83,18 @@
       MAC 猜錯 → 手動 fallback 不可達 → 死路。`connectQiyiDevice` 改 hello 驗證鏈
       （見 CHANGELOG），廣播等待 3s→5s。**實機驗收通過（2026-07-18，PR #32 部署後）**：
       使用者另以兩支從未連線過的 Android 手機實測，三品牌全部正常。
+- [ ] **筆電連魔域「連上無訊號 / 連不到」— 走錯層的教訓（2026-07-20，已 revert 回 baseline）**：
+      實機回報平板三家正常、筆電連魔域無訊號。曾試「寫入模式 fallback 鏈 + 探測例外
+      fast-fail」（PR 分支 7b41ca2 / 3c85fa5），**全部 revert**：(1) 沒解決 —— 筆電回報惡化成
+      `gatt.connect()` 直接失敗（Connection attempt failed），那是 BLE 連線層本身炸掉，
+      JS 寫入模式/金鑰探測改不動這一層；(2) 反傷 —— 多加的第二輪探測是額外 connect/write
+      churn，疑似把方塊 wedge 進「死連線→不廣播→連不到」（2026-07-13 舊病），且失敗的
+      魔域嘗試卡住 adapter，害**下一個連 XMD 的嘗試**噴 `GATT operation already in progress`
+      （連平板 XMD 都被波及，而 QiYi 程式碼一行沒動）。**教訓**：魔域無訊號要先分清是
+      「gatt.connect 成功但無資料」（金鑰/寫入層，可 JS 修）還是「gatt.connect 失敗」
+      （BLE/adapter/配對層，JS 無能為力，需系統層排查：移除 Windows 藍牙配對重連、
+      換 adapter、確認方塊沒被別的連線佔住）。動任何魔域連線流程前，先要一份筆電擷取
+      JSON 看它到底卡在哪一步，不要再盲改。
 - [ ] MoYu 電量/資訊封包實機 fixture（本次擷取未含 0xA1/0xA4）。
 - [x] `TESTING.md`：藍牙 I/O 層手動測試 checklist（SPEC §7 硬體無法進 CI 對策）——
       2026-07-17 完成，沉澱三品牌實機驗收流程 + 品牌特例 + 除錯工具 + 發佈前檢查。

@@ -5,55 +5,6 @@
 
 ## [Unreleased]
 
-### MoYu 筆電第二輪 — 連線流程炸點標示 + GATT 釋放 + 寫入例外 fallback（決策層 2026-07-20）
-
-寫入模式 fallback 鏈部署後筆電「情況一樣」。使用者回傳的擷取 JSON 是鐵證，推翻第一輪判讀：
-
-- **`packets: []`** —— `recordPacket` 在每次通知進來時無條件記錄（含探測期、與金鑰無關），
-  空陣列＝筆電從頭到尾**零 BLE 通知**。
-- **`brand: null`** —— 該欄位取自連線成功後才設定、teardown 不清除的 `lastCubeBrand`，
-  null＝該頁面工作階段中 `connectSmartCube` **從未成功返回**（中途拋例外），不是
-  「已連線 6 秒被看門狗踢掉」。炸點在 GATT 連線～init 寫入之間，但錯誤沒標階段、
-  探測期寫入例外又被 `.catch(() => {})` 靜默吞掉，遠端無從定位。
-
-本輪修三個確定缺陷（無論炸點最終在哪一階段都成立）：
-
-- **探測期寫入例外 fast-fail**：寫入 reject＝此模式在本平台根本不可用 → 立即判該候選
-  失敗（原本吞掉例外白等滿 timeout，且被誤判成「方塊沒回話」）→ fallback 鏈立刻改試
-  with-response。若筆電是「writeWithoutResponse 丟例外」變體，此修即可救回。
-- **init 寫入例外就地換模式**：盲連後 init 請求丟例外時就地改 with-response 重寫該筆並
-  沿用（`writeMode` 改為可變診斷欄位，同 `macSource` 定位），連線不再中途炸掉。
-- **中途失敗一律釋放 GATT**：`connectMoyuDevice` 任何階段拋例外都先 `gatt.disconnect()`
-  再拋 —— 死連線會讓方塊不再廣播、之後「完全連不到」（2026-07-13 看門狗層修過的
-  同款病，補上連線流程自身的釋放）。
-- **錯誤標明失敗階段**：連線 GATT / 找服務 / 找讀寫特徵值 / 開啟通知 / 初始化請求，
-  log 錯誤文字直接指出炸點；demo 的連線失敗與看門狗錯誤改走 `handleEvent` 進錄製緩衝，
-  下次擷取 JSON 匯出自帶失敗原因，不必再抄 log。
-- fixture 測試 +4（`tests/moyu-write-mode.test.ts`）：探測寫入丟例外 fast-fail（測試逾時
-  短於探測逾時證明不白等）、盲連後 init 例外就地換模式、找服務失敗 / 開啟通知失敗
-  各自標明階段且釋放 GATT；152 例綠燈。
-
-### MoYu 筆電無訊號修復 — 寫入模式 fallback 鏈（決策層 2026-07-20）
-
-實機回報（2026-07-19）：兩台平板連魔域正常，**筆電連上魔域卻無訊號**（看門狗 6 秒斷線）。
-同一顆方塊、同一名稱 → 名稱推導金鑰兩邊相同（平板實證金鑰正確），問題必在 I/O 層。
-主嫌是 67db315（2026-07-16）：為救「平板 0 封包」把寫入全面改 writeWithoutResponse ——
-而該 commit 自述「桌機時代能動（writeValue）、平板全滅」，現況正是其鏡像：部分桌機
-藍牙堆疊疑似靜默丟棄 without-response 寫入，指令根本沒到方塊。旁證：QiYi driver 全程
-用 writeValue，同一台筆電上唯獨魔域（唯一改 without-response 的品牌）失效。
-
-- **寫入模式 fallback 鏈**（QiYi hello 驗證鏈同精神）：金鑰探測先以平台偏好模式
-  （without-response）跑全候選 MAC；全滅時改用 with-response（writeValue）重探一輪
-  （重用第一輪 resolve 的候選，不再等廣播）；哪種模式有回話，整條連線（init 請求、
-  sendRequest、gyro 開啟）沿用該模式。平板現行路徑第一輪即定案，行為零改變。
-- 兩輪全滅 → 維持現行盲連行為（名稱推導直連 + 平台偏好模式，交看門狗）；特徵值
-  不宣告 writeWithoutResponse → 只跑 with-response 一輪（等同舊 writeValue 路徑）。
-- `MoyuDriver.writeMode` 新增診斷欄位（同 `macSource` 定位）；demo 連線行在 fallback
-  模式勝出時標示「· 寫入 with-response」，供筆電實機驗收判讀。凍結合約 `types.ts` 零改動。
-- fixture 測試 +4（`tests/moyu-write-mode.test.ts`）：mock 方塊「只認其中一種寫入模式
-  才回話」，覆蓋平板情境（第一輪定案）、筆電情境（第二輪救回且後續請求沿用）、
-  兩模式全滅盲連、特徵值不支援 without-response；148 例綠燈。
-
 ### 品牌 LOGO 展示（demo）— 連線行依品牌顯示 LOGO（決策層 2026-07-18）
 
 實作 SPEC_BRAND_LOGOS.md：連上方塊時，連線行顯示對應品牌 LOGO。
