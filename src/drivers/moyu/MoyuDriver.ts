@@ -48,8 +48,11 @@ export class MoyuDriver extends EventTarget implements SmartCube {
   readonly mac: string;
   /** 本次 MAC 的來源（診斷用）：app=macProvider 記住值 / name=名稱推導 / advertisement=廣播 / manual=手動。 */
   macSource: 'app' | 'name' | 'advertisement' | 'manual' | 'unknown' = 'unknown';
-  /** 本次連線實際使用的寫入模式（診斷用；探測期由 fallback 鏈定案，見 connectMoyuDevice）。 */
-  readonly writeMode: MoyuWriteMode;
+  /**
+   * 本次連線實際使用的寫入模式（診斷用；探測期由 fallback 鏈定案，見 connectMoyuDevice；
+   * 同 macSource 為可變診斷欄位 —— init 寫入丟例外時會就地改用 with-response 續行）。
+   */
+  writeMode: MoyuWriteMode;
   private readonly onValueChanged: (e: Event) => void;
   private readonly onGattDisconnected: () => void;
 
@@ -321,10 +324,12 @@ async function probeMoyuKey(
     const timer = setTimeout(() => finish(false), timeoutMs);
     chrctRead.addEventListener('characteristicvaluechanged', onValue);
     // 照實機驗收過的握手順序：先 INFO 再 STATE（部分韌體可能要求先收到 INFO 才回話）。
+    // 寫入丟例外 = 此寫入模式在本平台根本不可用 → 立即判失敗（不白等 timeout），
+    // 讓 fallback 鏈馬上換下一種模式（舊版把例外靜默吞掉，會誤判成「方塊沒回話」）。
     void (async () => {
       await writeCommand(chrctWrite, encode(buildRequest(OPCODE_INFO), aes, iv), writeMode);
       await writeCommand(chrctWrite, encode(buildRequest(OPCODE_STATE), aes, iv), writeMode);
-    })().catch(() => {});
+    })().catch(() => finish(false));
   });
 }
 
@@ -352,63 +357,95 @@ export async function connectMoyuDevice(
 ): Promise<MoyuDriver> {
   const deviceName = (device.name ?? '').trim();
 
-  const gatt = await device.gatt!.connect();
-  const service = await gatt.getPrimaryService(MOYU_SERVICE_UUID);
-  const chrctRead = await service.getCharacteristic(MOYU_CHRCT_READ);
-  const chrctWrite = await service.getCharacteristic(MOYU_CHRCT_WRITE);
-  await chrctRead.startNotifications();
-
-  // 候選 MAC（**不含手動輸入**：魔域金鑰用推導 MAC，使用者無從得知真 MAC，跳輸入框只會困惑）。
-  const specs: Array<{ source: MoyuDriver['macSource']; get: () => Promise<string | null> }> = [
-    { source: 'app', get: async () => (options.macProvider ? options.macProvider(device, false) : null) },
-    { source: 'name', get: async () => defaultMacFromName(deviceName) },
-    { source: 'advertisement', get: async () => readMacFromAdvertisement(device) },
-  ];
-
-  let writeMode = preferredWriteMode(chrctWrite);
-  const resolved: Array<{ mac: string; source: MoyuDriver['macSource'] }> = [];
-  let chosen: { mac: string; source: MoyuDriver['macSource'] } | null = null;
-  for (const s of specs) {
-    const mac = await s.get();
-    if (!mac) continue;
-    resolved.push({ mac, source: s.source });
-    if (await probeMoyuKey(chrctRead, chrctWrite, mac, writeMode, probeTimeoutMs)) {
-      chosen = { mac, source: s.source };
-      break;
+  // 錯誤標明失敗階段（2026-07-20 筆電實機回報「零封包 + 連線中途拋例外」，遠端只能靠
+  // log 裡的錯誤文字定位炸點 —— 各平台藍牙堆疊在不同階段失敗的訊息原文常常難以區分）。
+  const stage = async <T>(label: string, run: () => Promise<T>): Promise<T> => {
+    try {
+      return await run();
+    } catch (err) {
+      throw new Error(`MoYu 連線失敗於「${label}」：${err instanceof Error ? err.message : String(err)}`);
     }
-  }
-  // 第二輪：候選全滅且第一輪走 without-response → 改 with-response 重探（桌機丟包嫌疑）。
-  // 第一輪全滅時 specs 已全數 resolve，直接重用 resolved（避免廣播再等一次 3 秒）。
-  if (!chosen && writeMode === 'withoutResponse') {
-    for (const r of resolved) {
-      if (await probeMoyuKey(chrctRead, chrctWrite, r.mac, 'withResponse', probeTimeoutMs)) {
-        chosen = r;
-        writeMode = 'withResponse';
+  };
+
+  const gatt = await stage('連線 GATT', () => device.gatt!.connect());
+  try {
+    const service = await stage('找服務', () => gatt.getPrimaryService(MOYU_SERVICE_UUID));
+    const chrctRead = await stage('找讀特徵值', () => service.getCharacteristic(MOYU_CHRCT_READ));
+    const chrctWrite = await stage('找寫特徵值', () => service.getCharacteristic(MOYU_CHRCT_WRITE));
+    await stage('開啟通知', () => chrctRead.startNotifications());
+
+    // 候選 MAC（**不含手動輸入**：魔域金鑰用推導 MAC，使用者無從得知真 MAC，跳輸入框只會困惑）。
+    const specs: Array<{ source: MoyuDriver['macSource']; get: () => Promise<string | null> }> = [
+      { source: 'app', get: async () => (options.macProvider ? options.macProvider(device, false) : null) },
+      { source: 'name', get: async () => defaultMacFromName(deviceName) },
+      { source: 'advertisement', get: async () => readMacFromAdvertisement(device) },
+    ];
+
+    let writeMode = preferredWriteMode(chrctWrite);
+    const resolved: Array<{ mac: string; source: MoyuDriver['macSource'] }> = [];
+    let chosen: { mac: string; source: MoyuDriver['macSource'] } | null = null;
+    for (const s of specs) {
+      const mac = await s.get();
+      if (!mac) continue;
+      resolved.push({ mac, source: s.source });
+      if (await probeMoyuKey(chrctRead, chrctWrite, mac, writeMode, probeTimeoutMs)) {
+        chosen = { mac, source: s.source };
         break;
       }
     }
-  }
-  if (!chosen) {
-    if (resolved.length === 0) {
-      gatt.disconnect(); // 釋放 GATT，讓方塊能再度廣播（否則下次連不到）
-      throw new Error('MoYu 方塊需要 MAC 推導金鑰，但名稱推導與廣播都無法取得。');
+    // 第二輪：候選全滅且第一輪走 without-response → 改 with-response 重探（桌機丟包嫌疑）。
+    // 第一輪全滅時 specs 已全數 resolve，直接重用 resolved（避免廣播再等一次 3 秒）。
+    if (!chosen && writeMode === 'withoutResponse') {
+      for (const r of resolved) {
+        if (await probeMoyuKey(chrctRead, chrctWrite, r.mac, 'withResponse', probeTimeoutMs)) {
+          chosen = r;
+          writeMode = 'withResponse';
+          break;
+        }
+      }
     }
-    // 探測都沒通過：**不跳輸入框**，改用最可能的候選（名稱推導優先）直接連上；
-    // 若真的沒串流，畫面看門狗會 6 秒後報出並斷線 —— 那代表此韌體金鑰算法尚未支援（需錄封包逆向）。
-    chosen = resolved.find((r) => r.source === 'name') ?? resolved[0]!;
-    writeMode = preferredWriteMode(chrctWrite); // 盲連時回到平台偏好模式（現行行為不變）
-  }
+    if (!chosen) {
+      if (resolved.length === 0) {
+        throw new Error('MoYu 方塊需要 MAC 推導金鑰，但名稱推導與廣播都無法取得。');
+      }
+      // 探測都沒通過：**不跳輸入框**，改用最可能的候選（名稱推導優先）直接連上；
+      // 若真的沒串流，畫面看門狗會 6 秒後報出並斷線 —— 那代表此韌體金鑰算法尚未支援（需錄封包逆向）。
+      chosen = resolved.find((r) => r.source === 'name') ?? resolved[0]!;
+      writeMode = preferredWriteMode(chrctWrite); // 盲連時回到平台偏好模式（現行行為不變）
+    }
 
-  const driver = new MoyuDriver(device, chrctRead, chrctWrite, deviceName, chosen.mac, writeMode);
-  driver.macSource = chosen.source;
-  // 依序要求硬體資訊、初始狀態、電量（初始狀態封包提供 facelet 基準與 move 計數起點）。
-  const { key, iv } = deriveKeyIv(chosen.mac);
-  const aes = new Aes128(key);
-  for (const opcode of [OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY]) {
-    await writeCommand(chrctWrite, encode(buildRequest(opcode), aes, iv), writeMode);
+    const driver = new MoyuDriver(device, chrctRead, chrctWrite, deviceName, chosen.mac, writeMode);
+    driver.macSource = chosen.source;
+    // init 寫入：without-response 丟例外 = 本平台此模式不可用 → 就地改 with-response 重寫這筆並沿用。
+    const initWrite = async (bytes: readonly number[]): Promise<void> => {
+      try {
+        await writeCommand(chrctWrite, bytes, driver.writeMode);
+      } catch (err) {
+        if (driver.writeMode !== 'withoutResponse') throw err;
+        driver.writeMode = 'withResponse';
+        await writeCommand(chrctWrite, bytes, 'withResponse');
+      }
+    };
+    // 依序要求硬體資訊、初始狀態、電量（初始狀態封包提供 facelet 基準與 move 計數起點）。
+    const { key, iv } = deriveKeyIv(chosen.mac);
+    const aes = new Aes128(key);
+    await stage('初始化請求', async () => {
+      for (const opcode of [OPCODE_INFO, OPCODE_STATE, OPCODE_BATTERY]) {
+        await initWrite(encode(buildRequest(opcode), aes, iv));
+      }
+      // 開啟陀螺儀串流（opcode 172）：方塊預設不送 gyro，須主動開啟。放在三個請求之後，
+      // 即使個別韌體不認得此指令，state/battery 已請求完畢、基本功能不受影響。
+      await initWrite(encode(buildGyroControl(true), aes, iv));
+    });
+    return driver;
+  } catch (err) {
+    // 任何中途失敗都釋放 GATT：BLE 裝置連線中不廣播，死連線會讓方塊之後「完全連不到」
+    //（2026-07-13 看門狗層修過的同款病，這裡補上連線流程自身的釋放）。
+    try {
+      gatt.disconnect();
+    } catch {
+      /* ignore */
+    }
+    throw err;
   }
-  // 開啟陀螺儀串流（opcode 172）：方塊預設不送 gyro，須主動開啟。放在三個請求之後，
-  // 即使個別韌體不認得此指令，state/battery 已請求完畢、基本功能不受影響。
-  await writeCommand(chrctWrite, encode(buildGyroControl(true), aes, iv), writeMode);
-  return driver;
 }

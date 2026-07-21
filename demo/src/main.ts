@@ -412,7 +412,8 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
     window.setTimeout(() => {
       if (dataArrived || cube !== connectedCube) return;
       if (usedSavedMac && deviceForRecovery) clearSavedMac(deviceForRecovery);
-      appendEvent({
+      // 走 handleEvent 讓錯誤也進錄製緩衝：擷取 JSON 匯出時能帶著失敗原因（遠端診斷用）。
+      handleEvent({
         type: 'error',
         error: new Error(
           `已連線 6 秒但沒收到任何資料（連電量都沒有）。本次使用 MAC ${diag.mac ?? '（不明）'}` +
@@ -435,7 +436,8 @@ async function doConnect(connectFn: () => Promise<SmartCube>): Promise<void> {
     await cube.requestBattery();
     await cube.requestState();
   } catch (err) {
-    appendEvent({ type: 'error', error: err instanceof Error ? err : new Error(String(err)) });
+    // 走 handleEvent 讓連線失敗也進錄製緩衝（同看門狗；擷取 JSON 會帶失敗階段與原因）。
+    handleEvent({ type: 'error', error: err instanceof Error ? err : new Error(String(err)) });
     teardown();
   }
 }
