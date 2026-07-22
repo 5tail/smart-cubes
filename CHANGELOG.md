@@ -5,6 +5,30 @@
 
 ## [Unreleased]
 
+### 連線穩定性大修 — GATT 逾時 + 失敗保證釋放連線（決策層 2026-07-21）
+
+實機回報：反覆連線後方塊「連上有封包但畫面不動 / 一直 `GATT operation already in progress`
+/ 只有淦源能連 / 筆電佔住方塊要重刷網頁才放」。根因是連線流程的**清理缺口**（非協議問題）：
+
+- Web Bluetooth 的 GATT 操作（`connect` / `getPrimaryService` / `startNotifications`）**無內建逾時**。
+  方塊卡死時這些操作永久 hang → 連線流程整個掛住、**半開的死連線佔住 adapter** →
+  下一次連線（甚至其他品牌）噴 `already in progress`，且被佔住的方塊**連線中不廣播** →
+  對其他裝置隱形（「筆電佔住、平板找不到」的實機觀察即此）。失敗的連線一條條堆積，越弄越死。
+- **修法**（只動連線流程，不碰協議解析、不碰凍結合約 `types.ts`）：
+  - 新增 `src/utils/timeout.ts` 的 `withTimeout(promise, ms, label)`：把會永久 hang 的 GATT
+    操作包上逾時，逾時即以「階段標籤 + 逾時」拒絕（不再無限等待）。
+  - `connectQiyiDevice` / `connectMoyuDevice`：GATT 生命週期全包進 try，connect / 服務探索 /
+    開啟通知逐一套 `withTimeout`（預設 10s，測試可經新增的 `gattTimeoutMs` 參數縮短）；
+    **任何失敗/逾時都在 catch 內 `device.gatt?.disconnect()` 保證釋放**（connect 逾時時區域
+    變數尚未賦值，故用 `device.gatt`）。失敗連線不再遺留死連線 → 失敗只要「再按一次」即可。
+  - 成功路徑、hello 驗證鏈、MoYu 金鑰探測邏輯**零改動**（現有 144 例全數不動即通過，佐證行為未變）。
+- fixture 測試 +12（`tests/connect-robustness.test.ts`）：`withTimeout` 三態（完成透傳/逾時
+  拒絕/原錯誤透傳）；QiYi 四個 GATT 階段各自 hang → 逾時拒絕且釋放、GATT reject → 透傳且釋放；
+  MoYu 四個 GATT 階段 hang → 逾時拒絕且釋放。156 例綠燈，root/demo typecheck 與 demo build 通過。
+- **注意**：desktop 藍牙堆疊本身的不穩定在瀏覽器底層、程式改不到；本修消除的是「失敗→卡死→
+  要重置藍牙」的堆積迴圈，讓失敗變成可重試，而非保證每次都連上。QiYi 首次連線仍需正確 MAC
+  （決策層選定走 Chrome 旗標自動讀廣播 MAC；GAN/魔域免設定）。
+
 ### 品牌 LOGO 展示（demo）— 連線行依品牌顯示 LOGO（決策層 2026-07-18）
 
 實作 SPEC_BRAND_LOGOS.md：連上方塊時，連線行顯示對應品牌 LOGO。

@@ -13,6 +13,7 @@ import {
 } from './protocol.js';
 import { SOLVED_FACELET } from '../../utils/facelets.js';
 import { recordPacket } from '../../utils/debug.js';
+import { withTimeout } from '../../utils/timeout.js';
 
 /**
  * QiYi AI 3x3 driver：實作統一 SmartCube 介面。
@@ -235,6 +236,11 @@ export async function connectQiyiCube(options: ConnectOptions = {}): Promise<Qiy
 // 1.5 秒已含餘裕；三候選全跑最壞 4.5 秒，仍在 demo 的 6 秒看門狗之內。
 const HELLO_VERIFY_MS = 1500;
 
+// GATT 操作逾時（connect / 服務探索 / 開啟通知）：方塊卡死時這些操作無內建逾時會永久 hang，
+// 佔住 adapter 造成下一次連線 `already in progress`。逾時後由 catch 保證斷線清理（見下方）。
+// 正常連線這些操作 <2 秒；10 秒是「卡死判定」上限，不影響慢速但正常的連線。
+const GATT_TIMEOUT_MS = 10000;
+
 /**
  * 對「已選好的裝置」建立 QiYi 連線（統一選擇視窗 connectSmartCube 的分派目標）。
  *
@@ -248,6 +254,7 @@ const HELLO_VERIFY_MS = 1500;
 export async function connectQiyiDevice(
   device: BluetoothDevice,
   options: ConnectOptions = {},
+  gattTimeoutMs = GATT_TIMEOUT_MS,
 ): Promise<QiyiDriver> {
   const deviceName = (device.name ?? '').trim();
 
@@ -263,35 +270,56 @@ export async function connectQiyiDevice(
     throw new Error('QiYi 方塊需要 MAC address 才能建立連線，且無法自動取得');
   }
 
-  const gatt = await device.gatt!.connect();
-  const service = await gatt.getPrimaryService(QIYI_SERVICE_UUID);
-  const chrct = await service.getCharacteristic(QIYI_CHRCT_UUID);
-  await chrct.startNotifications();
+  // 連線穩定性：GATT 生命週期全包在 try 內，任何失敗/逾時都保證 disconnect 釋放連線
+  //（半開的死連線會佔住 adapter，導致下一次連線 `already in progress`、方塊也不再廣播）。
+  try {
+    const gatt = await withTimeout(device.gatt!.connect(), gattTimeoutMs, 'QiYi 連線 GATT');
+    const service = await withTimeout(
+      gatt.getPrimaryService(QIYI_SERVICE_UUID),
+      gattTimeoutMs,
+      'QiYi 取得服務',
+    );
+    const chrct = await withTimeout(
+      service.getCharacteristic(QIYI_CHRCT_UUID),
+      gattTimeoutMs,
+      'QiYi 取得特徵值',
+    );
+    await withTimeout(chrct.startNotifications(), gattTimeoutMs, 'QiYi 開啟通知');
 
-  const driver = new QiyiDriver(device, chrct, deviceName, candidates[0]?.mac ?? '');
+    const driver = new QiyiDriver(device, chrct, deviceName, candidates[0]?.mac ?? '');
 
-  // hello 驗證鏈：依序試每個候選，方塊有回話（facelets/battery/move）即定案。
-  for (const cand of candidates) {
-    driver._setMac(cand.mac, cand.source);
-    if (await driver._helloAndVerify(HELLO_VERIFY_MS)) return driver;
-  }
-
-  // 自動候選全部沉默 → 手動輸入（app 層對話框；使用者可循引導開旗標後重連）。
-  if (options.macProvider) {
-    const manual = await options.macProvider(device, true);
-    if (manual) {
-      driver._setMac(manual, 'manual');
-      await driver.requestState(); // 送 hello；成敗交由 app 層（如 demo 看門狗）回報
-      return driver;
+    // hello 驗證鏈：依序試每個候選，方塊有回話（facelets/battery/move）即定案。
+    for (const cand of candidates) {
+      driver._setMac(cand.mac, cand.source);
+      if (await driver._helloAndVerify(HELLO_VERIFY_MS)) return driver;
     }
-  }
 
-  if (candidates.length === 0) {
-    // 連手動都沒有：釋放連線再丟錯（死連線會讓方塊之後完全連不到）。
-    await driver.disconnect();
-    throw new Error('QiYi 方塊需要 MAC address 才能建立連線，且無法自動取得');
+    // 自動候選全部沉默 → 手動輸入（app 層對話框；使用者可循引導開旗標後重連）。
+    if (options.macProvider) {
+      const manual = await options.macProvider(device, true);
+      if (manual) {
+        driver._setMac(manual, 'manual');
+        await driver.requestState(); // 送 hello；成敗交由 app 層（如 demo 看門狗）回報
+        return driver;
+      }
+    }
+
+    if (candidates.length === 0) {
+      // 連手動都沒有：釋放連線再丟錯（死連線會讓方塊之後完全連不到）。
+      await driver.disconnect();
+      throw new Error('QiYi 方塊需要 MAC address 才能建立連線，且無法自動取得');
+    }
+    // 有候選但全部無回應且使用者未手動輸入：回傳 driver（保留最後一個候選），
+    // 由 app 層看門狗以 mac/macSource 診斷資訊提示下一步。
+    return driver;
+  } catch (err) {
+    // device.gatt 為同一個 GATTServer 物件；connect 逾時時 gatt 區域變數尚未賦值，
+    // 用 device.gatt 才能在該情境也釋放。二次斷線無害。
+    try {
+      device.gatt?.disconnect();
+    } catch {
+      /* 已斷線/未連線時忽略 */
+    }
+    throw err;
   }
-  // 有候選但全部無回應且使用者未手動輸入：回傳 driver（保留最後一個候選），
-  // 由 app 層看門狗以 mac/macSource 診斷資訊提示下一步。
-  return driver;
 }
